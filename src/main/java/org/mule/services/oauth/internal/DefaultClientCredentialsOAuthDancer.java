@@ -45,7 +45,7 @@ import org.slf4j.Logger;
 /**
  * Provides OAuth dance support for client-credentials grant-type.
  * 
- * @since 4.0
+ * @since 1.0
  */
 public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer implements Startable, ClientCredentialsOAuthDancer {
 

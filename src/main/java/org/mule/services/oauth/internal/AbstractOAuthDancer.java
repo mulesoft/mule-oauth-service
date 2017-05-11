@@ -52,7 +52,7 @@ import java.util.concurrent.locks.Lock;
 /**
  * Base implementations with behavior common to all grant-types.
  *
- * @since 4.0
+ * @since 1.0
  */
 public abstract class AbstractOAuthDancer implements Startable, Stoppable {
 

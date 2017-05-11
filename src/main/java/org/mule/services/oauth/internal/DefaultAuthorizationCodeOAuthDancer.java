@@ -94,7 +94,7 @@ import org.slf4j.Logger;
 /**
  * Provides OAuth dance support for authorization-code grant-type.
  * 
- * @since 4.0
+ * @since 1.0
  */
 public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer implements AuthorizationCodeOAuthDancer, Lifecycle {
 

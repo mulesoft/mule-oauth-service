@@ -15,7 +15,7 @@ import java.util.Optional;
 /**
  * Immutable implementation of {@link AuthorizationCodeRequest}.
  * 
- * @since 4.0
+ * @since 1.0
  */
 public class DefaultAuthorizationCodeRequest implements AuthorizationCodeRequest {
 
