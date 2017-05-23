@@ -4,7 +4,7 @@
  * license, a copy of which has been included with this distribution in the
  * LICENSE.txt file.
  */
-package org.mule.services.oauth.internal;
+package org.mule.service.oauth.internal;
 
 import static java.lang.String.format;
 import static java.lang.Thread.currentThread;
@@ -12,11 +12,11 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 import static org.apache.commons.codec.binary.Base64.encodeBase64String;
 import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
-import static org.mule.services.oauth.internal.OAuthConstants.CLIENT_ID_PARAMETER;
-import static org.mule.services.oauth.internal.OAuthConstants.CLIENT_SECRET_PARAMETER;
-import static org.mule.services.oauth.internal.OAuthConstants.GRANT_TYPE_CLIENT_CREDENTIALS;
-import static org.mule.services.oauth.internal.OAuthConstants.GRANT_TYPE_PARAMETER;
-import static org.mule.services.oauth.internal.OAuthConstants.SCOPE_PARAMETER;
+import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_ID_PARAMETER;
+import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_SECRET_PARAMETER;
+import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_CLIENT_CREDENTIALS;
+import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_PARAMETER;
+import static org.mule.service.oauth.internal.OAuthConstants.SCOPE_PARAMETER;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.el.MuleExpressionLanguage;
@@ -24,14 +24,14 @@ import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.lifecycle.LifecycleException;
 import org.mule.runtime.api.lifecycle.Startable;
 import org.mule.runtime.api.lock.LockFactory;
+import org.mule.runtime.http.api.client.HttpClient;
 import org.mule.runtime.oauth.api.ClientCredentialsOAuthDancer;
 import org.mule.runtime.oauth.api.exception.RequestAuthenticationException;
 import org.mule.runtime.oauth.api.exception.TokenNotFoundException;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
 import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
-import org.mule.service.http.api.client.HttpClient;
-import org.mule.services.oauth.internal.state.TokenResponse;
+import org.mule.service.oauth.internal.state.TokenResponse;
 
 import java.nio.charset.Charset;
 import java.util.HashMap;

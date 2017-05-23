@@ -4,7 +4,7 @@
  * license, a copy of which has been included with this distribution in the
  * LICENSE.txt file.
  */
-package org.mule.services.oauth.internal.builder;
+package org.mule.service.oauth.internal.builder;
 
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
@@ -17,16 +17,16 @@ import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.lock.LockFactory;
 import org.mule.runtime.api.tls.TlsContextFactory;
 import org.mule.runtime.core.api.scheduler.SchedulerService;
+import org.mule.runtime.http.api.HttpService;
+import org.mule.runtime.http.api.server.HttpServer;
+import org.mule.runtime.http.api.server.HttpServerConfiguration;
 import org.mule.runtime.oauth.api.AuthorizationCodeOAuthDancer;
 import org.mule.runtime.oauth.api.AuthorizationCodeRequest;
 import org.mule.runtime.oauth.api.builder.AuthorizationCodeDanceCallbackContext;
 import org.mule.runtime.oauth.api.builder.OAuthAuthorizationCodeDancerBuilder;
 import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
-import org.mule.service.http.api.HttpService;
-import org.mule.service.http.api.server.HttpServer;
-import org.mule.service.http.api.server.HttpServerConfiguration;
-import org.mule.services.oauth.internal.DefaultAuthorizationCodeOAuthDancer;
+import org.mule.service.oauth.internal.DefaultAuthorizationCodeOAuthDancer;
 
 import java.net.URL;
 import java.util.Map;

@@ -4,16 +4,16 @@
  * license, a copy of which has been included with this distribution in the
  * LICENSE.txt file.
  */
-package org.mule.services.oauth.provider;
+package org.mule.service.oauth.provider;
 
 import static java.util.Collections.singletonList;
 
 import org.mule.runtime.api.service.ServiceDefinition;
 import org.mule.runtime.api.service.ServiceProvider;
 import org.mule.runtime.core.api.scheduler.SchedulerService;
+import org.mule.runtime.http.api.HttpService;
 import org.mule.runtime.oauth.api.OAuthService;
-import org.mule.service.http.api.HttpService;
-import org.mule.services.oauth.internal.DefaultOAuthService;
+import org.mule.service.oauth.internal.DefaultOAuthService;
 
 import java.util.List;
 

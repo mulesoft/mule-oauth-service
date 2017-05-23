@@ -4,7 +4,7 @@
  * license, a copy of which has been included with this distribution in the
  * LICENSE.txt file.
  */
-package org.mule.services.oauth.internal.state;
+package org.mule.service.oauth.internal.state;
 
 import static java.util.Collections.unmodifiableMap;
 

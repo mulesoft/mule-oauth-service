@@ -4,18 +4,18 @@
  * license, a copy of which has been included with this distribution in the
  * LICENSE.txt file.
  */
-package org.mule.services.oauth.internal;
+package org.mule.service.oauth.internal;
 
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.lock.LockFactory;
 import org.mule.runtime.core.api.scheduler.SchedulerService;
+import org.mule.runtime.http.api.HttpService;
 import org.mule.runtime.oauth.api.OAuthService;
 import org.mule.runtime.oauth.api.builder.OAuthAuthorizationCodeDancerBuilder;
 import org.mule.runtime.oauth.api.builder.OAuthClientCredentialsDancerBuilder;
 import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
-import org.mule.service.http.api.HttpService;
-import org.mule.services.oauth.internal.builder.DefaultOAuthAuthorizationCodeDancerBuilder;
-import org.mule.services.oauth.internal.builder.DefaultOAuthClientCredentialsDancerBuilder;
+import org.mule.service.oauth.internal.builder.DefaultOAuthAuthorizationCodeDancerBuilder;
+import org.mule.service.oauth.internal.builder.DefaultOAuthClientCredentialsDancerBuilder;
 
 import java.util.Map;
 

@@ -4,18 +4,19 @@
  * license, a copy of which has been included with this distribution in the
  * LICENSE.txt file.
  */
-package org.mule.services.oauth.internal;
+package org.mule.service.oauth.internal;
 
 import static org.mule.runtime.api.metadata.DataType.STRING;
 import static org.mule.runtime.api.metadata.MediaType.ANY;
 import static org.mule.runtime.api.metadata.MediaType.parse;
-import static org.mule.service.http.api.HttpConstants.HttpStatus.BAD_REQUEST;
-import static org.mule.service.http.api.HttpConstants.Method.POST;
-import static org.mule.service.http.api.HttpHeaders.Names.AUTHORIZATION;
-import static org.mule.service.http.api.HttpHeaders.Names.CONTENT_TYPE;
-import static org.mule.service.http.api.HttpHeaders.Values.APPLICATION_X_WWW_FORM_URLENCODED;
-import static org.mule.service.http.api.utils.HttpEncoderDecoderUtils.decodeUrlEncodedBody;
-import static org.mule.service.http.api.utils.HttpEncoderDecoderUtils.encodeString;
+import static org.mule.runtime.http.api.HttpConstants.HttpStatus.BAD_REQUEST;
+import static org.mule.runtime.http.api.HttpConstants.Method.POST;
+import static org.mule.runtime.http.api.HttpHeaders.Names.AUTHORIZATION;
+import static org.mule.runtime.http.api.HttpHeaders.Names.CONTENT_TYPE;
+import static org.mule.runtime.http.api.HttpHeaders.Values.APPLICATION_X_WWW_FORM_URLENCODED;
+import static org.mule.runtime.http.api.utils.HttpEncoderDecoderUtils.decodeUrlEncodedBody;
+import static org.mule.runtime.http.api.utils.HttpEncoderDecoderUtils.encodeString;
+
 import org.mule.runtime.api.el.BindingContext;
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.MuleException;
@@ -27,18 +28,18 @@ import org.mule.runtime.api.metadata.MediaType;
 import org.mule.runtime.api.metadata.TypedValue;
 import org.mule.runtime.core.util.IOUtils;
 import org.mule.runtime.core.util.MapUtils;
+import org.mule.runtime.http.api.client.HttpClient;
+import org.mule.runtime.http.api.domain.ParameterMap;
+import org.mule.runtime.http.api.domain.entity.ByteArrayHttpEntity;
+import org.mule.runtime.http.api.domain.entity.InputStreamHttpEntity;
+import org.mule.runtime.http.api.domain.message.request.HttpRequest;
+import org.mule.runtime.http.api.domain.message.request.HttpRequestBuilder;
+import org.mule.runtime.http.api.domain.message.response.HttpResponse;
 import org.mule.runtime.oauth.api.exception.TokenNotFoundException;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
 import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
-import org.mule.service.http.api.client.HttpClient;
-import org.mule.service.http.api.domain.ParameterMap;
-import org.mule.service.http.api.domain.entity.ByteArrayHttpEntity;
-import org.mule.service.http.api.domain.entity.InputStreamHttpEntity;
-import org.mule.service.http.api.domain.message.request.HttpRequest;
-import org.mule.service.http.api.domain.message.request.HttpRequestBuilder;
-import org.mule.service.http.api.domain.message.response.HttpResponse;
-import org.mule.services.oauth.internal.state.TokenResponse;
+import org.mule.service.oauth.internal.state.TokenResponse;
 
 import java.io.IOException;
 import java.nio.charset.Charset;

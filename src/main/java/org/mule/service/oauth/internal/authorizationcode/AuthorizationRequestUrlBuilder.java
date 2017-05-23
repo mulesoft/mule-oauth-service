@@ -4,16 +4,16 @@
  * license, a copy of which has been included with this distribution in the
  * LICENSE.txt file.
  */
-package org.mule.services.oauth.internal.authorizationcode;
+package org.mule.service.oauth.internal.authorizationcode;
 
 import static java.lang.String.format;
 import static java.net.URLEncoder.encode;
 import static org.apache.commons.lang.StringUtils.isNotBlank;
 import static org.mule.runtime.api.util.Preconditions.checkArgument;
-import static org.mule.services.oauth.internal.OAuthConstants.CLIENT_ID_PARAMETER;
-import static org.mule.services.oauth.internal.OAuthConstants.REDIRECT_URI_PARAMETER;
-import static org.mule.services.oauth.internal.OAuthConstants.SCOPE_PARAMETER;
-import static org.mule.services.oauth.internal.OAuthConstants.STATE_PARAMETER;
+import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_ID_PARAMETER;
+import static org.mule.service.oauth.internal.OAuthConstants.REDIRECT_URI_PARAMETER;
+import static org.mule.service.oauth.internal.OAuthConstants.SCOPE_PARAMETER;
+import static org.mule.service.oauth.internal.OAuthConstants.STATE_PARAMETER;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import java.io.UnsupportedEncodingException;

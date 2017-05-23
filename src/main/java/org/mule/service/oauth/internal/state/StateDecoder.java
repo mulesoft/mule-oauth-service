@@ -4,10 +4,10 @@
  * license, a copy of which has been included with this distribution in the
  * LICENSE.txt file.
  */
-package org.mule.services.oauth.internal.state;
+package org.mule.service.oauth.internal.state;
 
-import static org.mule.services.oauth.internal.state.StateEncoder.ON_COMPLETE_REDIRECT_TO_PARAM_NAME_ASSIGN;
-import static org.mule.services.oauth.internal.state.StateEncoder.RESOURCE_OWNER_PARAM_NAME_ASSIGN;
+import static org.mule.service.oauth.internal.state.StateEncoder.ON_COMPLETE_REDIRECT_TO_PARAM_NAME_ASSIGN;
+import static org.mule.service.oauth.internal.state.StateEncoder.RESOURCE_OWNER_PARAM_NAME_ASSIGN;
 
 /**
  * Decoder for the oauth state. Allows to retrieve the parameters encoded in an state and to retrieve the original state.
@@ -25,7 +25,7 @@ public class StateDecoder {
 
   /**
    * Decodes the original state from an encoded state using
-   * {@link org.mule.services.oauth.internal.state.StateEncoder#encodeResourceOwnerIdInState}
+   * {@link org.mule.service.oauth.internal.state.StateEncoder#encodeResourceOwnerIdInState}
    *
    * @return the original state, null if the original state was empty.
    */
@@ -56,7 +56,7 @@ public class StateDecoder {
 
   /**
    * Decodes the resource owner id from an encoded state using
-   * {@link org.mule.services.oauth.internal.state.StateEncoder#encodeResourceOwnerIdInState}
+   * {@link org.mule.service.oauth.internal.state.StateEncoder#encodeResourceOwnerIdInState}
    *
    * @return the resource owner id, null if there's no oauth state id encoded in it.
    */

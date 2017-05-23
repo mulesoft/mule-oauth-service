@@ -10,8 +10,8 @@ import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsNull.nullValue;
 import static org.junit.Assert.assertThat;
 
-import org.mule.services.oauth.internal.state.StateDecoder;
-import org.mule.services.oauth.internal.state.StateEncoder;
+import org.mule.service.oauth.internal.state.StateDecoder;
+import org.mule.service.oauth.internal.state.StateEncoder;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 
 import org.junit.Test;
