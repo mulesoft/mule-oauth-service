@@ -6,6 +6,7 @@
  */
 package org.mule.service.oauth.internal;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.mule.runtime.api.metadata.DataType.STRING;
 import static org.mule.runtime.api.metadata.MediaType.ANY;
 import static org.mule.runtime.api.metadata.MediaType.parse;
@@ -16,6 +17,7 @@ import static org.mule.runtime.http.api.HttpHeaders.Names.CONTENT_TYPE;
 import static org.mule.runtime.http.api.HttpHeaders.Values.APPLICATION_X_WWW_FORM_URLENCODED;
 import static org.mule.runtime.http.api.utils.HttpEncoderDecoderUtils.decodeUrlEncodedBody;
 import static org.mule.runtime.http.api.utils.HttpEncoderDecoderUtils.encodeString;
+import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
 import org.mule.runtime.api.el.BindingContext;
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.MuleException;
@@ -236,7 +238,11 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
    * @param resourceOwnerId id of the user.
    * @return oauth state
    */
-  public ResourceOwnerOAuthContext getContextForResourceOwner(final String resourceOwnerId) {
+  public ResourceOwnerOAuthContext getContextForResourceOwner(String resourceOwnerId) {
+    if (resourceOwnerId == null) {
+      resourceOwnerId = DEFAULT_RESOURCE_OWNER_ID;
+    }
+
     final String transformedResourceOwnerId = resourceOwnerIdTransformer.apply(resourceOwnerId);
 
     DefaultResourceOwnerOAuthContext resourceOwnerOAuthContext = null;
@@ -261,7 +267,8 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   }
 
   private Lock createLockForResourceOwner(String resourceOwnerId) {
-    return lockProvider.createLock(toString() + "-" + resourceOwnerId);
+    String lockId = toString() + (isBlank(resourceOwnerId) ? "" : "-" + resourceOwnerId);
+    return lockProvider.createLock(lockId);
   }
 
   /**
