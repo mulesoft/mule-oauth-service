@@ -29,7 +29,7 @@ import org.mule.runtime.api.metadata.MediaType;
 import org.mule.runtime.api.metadata.TypedValue;
 import org.mule.runtime.core.api.util.IOUtils;
 import org.mule.runtime.http.api.client.HttpClient;
-import org.mule.runtime.http.api.domain.ParameterMap;
+import org.mule.runtime.api.util.MultiMap;
 import org.mule.runtime.http.api.domain.entity.ByteArrayHttpEntity;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
 import org.mule.runtime.http.api.domain.message.request.HttpRequestBuilder;
@@ -127,7 +127,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
 
       MediaType responseContentType =
           response.getHeaderValueIgnoreCase(CONTENT_TYPE) != null ? parse(response.getHeaderValueIgnoreCase(CONTENT_TYPE)) : ANY;
-      ParameterMap headers = new ParameterMap();
+      MultiMap<String, String> headers = new MultiMap<>();
       for (String headerName : response.getHeaderNames()) {
         headers.put(headerName, response.getHeaderValues(headerName));
       }
@@ -172,7 +172,8 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     }
   }
 
-  protected <T> T resolveExpression(String expr, Object body, ParameterMap headers, MediaType responseContentType) {
+  protected <T> T resolveExpression(String expr, Object body, MultiMap<String, String> headers,
+                                    MediaType responseContentType) {
     if (expr == null) {
       return null;
     } else if (!expressionEvaluator.isExpression(expr)) {
@@ -184,7 +185,11 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
                           .mediaType(responseContentType).build()))
 
           .addBinding("attributes", new TypedValue(Collections.singletonMap("headers", headers.toImmutableParameterMap()),
-                                                   DataType.fromType(Map.class)))
+                                                   DataType.builder()
+                                                       .mapType(MultiMap.class)
+                                                       .keyType(String.class)
+                                                       .valueType(String.class)
+                                                       .build()))
           .addBinding("dataType",
                       new TypedValue(DataType.builder().fromObject(body).mediaType(responseContentType)
                           .build(), DataType.fromType(DataType.class)))
@@ -194,8 +199,8 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     }
   }
 
-  protected <T> T resolveExpression(String expr, Object body, ParameterMap headers, ParameterMap queryParams,
-                                    MediaType responseContentType) {
+  protected <T> T resolveExpression(String expr, Object body, MultiMap<String, String> headers,
+                                    MultiMap<String, String> queryParams, MediaType responseContentType) {
     if (expr == null) {
       return null;
     } else if (!expressionEvaluator.isExpression(expr)) {

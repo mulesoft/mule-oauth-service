@@ -43,7 +43,7 @@ import org.mule.runtime.core.api.scheduler.SchedulerService;
 import org.mule.runtime.http.api.HttpService;
 import org.mule.runtime.http.api.client.HttpClient;
 import org.mule.runtime.http.api.client.HttpClientFactory;
-import org.mule.runtime.http.api.domain.ParameterMap;
+import org.mule.runtime.api.util.MultiMap;
 import org.mule.runtime.http.api.domain.entity.InputStreamHttpEntity;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
 import org.mule.runtime.http.api.domain.message.response.HttpResponse;
@@ -424,7 +424,7 @@ public class DancerConfigTestCase extends AbstractMuleContextTestCase {
 
   private void configureRequestHandler(String resourceOwner, String state) {
     HttpRequest authorizationRequest = mock(HttpRequest.class);
-    ParameterMap authReqQueryParams = new ParameterMap();
+    MultiMap<String, String> authReqQueryParams = new MultiMap<>();
     authReqQueryParams.put(STATE_PARAMETER, state + RESOURCE_OWNER_PARAM_NAME_ASSIGN + resourceOwner);
     authReqQueryParams.put(CODE_PARAMETER, "");
     when(authorizationRequest.getQueryParams()).thenReturn(authReqQueryParams);

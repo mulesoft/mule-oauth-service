@@ -54,7 +54,7 @@ import org.mule.runtime.http.api.HttpConstants;
 import org.mule.runtime.http.api.HttpConstants.HttpStatus;
 import org.mule.runtime.http.api.HttpConstants.Method;
 import org.mule.runtime.http.api.client.HttpClient;
-import org.mule.runtime.http.api.domain.ParameterMap;
+import org.mule.runtime.api.util.MultiMap;
 import org.mule.runtime.http.api.domain.entity.ByteArrayHttpEntity;
 import org.mule.runtime.http.api.domain.entity.EmptyHttpEntity;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
@@ -197,7 +197,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
   private RequestHandler createRedirectUrlListener() {
     return (requestContext, responseCallback) -> {
       final HttpRequest request = requestContext.getRequest();
-      final ParameterMap queryParams = request.getQueryParams();
+      final MultiMap<String, String> queryParams = request.getQueryParams();
 
       final String state = queryParams.get(STATE_PARAMETER);
       final StateDecoder stateDecoder = new StateDecoder(state);
@@ -338,9 +338,9 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
   @Override
   public void handleLocalAuthorizationRequest(HttpRequest request, HttpResponseReadyCallback responseCallback) {
     final String body = readBody(request);
-    final ParameterMap headers = readHeaders(request);
+    final MultiMap<String, String> headers = readHeaders(request);
     final MediaType mediaType = getMediaType(request);
-    final ParameterMap queryParams = request.getQueryParams();
+    final MultiMap<String, String> queryParams = request.getQueryParams();
 
     final String originalState = resolveExpression(state, body, headers, queryParams, mediaType);
     final StateEncoder stateEncoder = new StateEncoder(originalState);
@@ -374,8 +374,8 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
     return IOUtils.toString(request.getEntity().getContent());
   }
 
-  private ParameterMap readHeaders(final HttpRequest request) {
-    ParameterMap headers = new ParameterMap();
+  private MultiMap<String, String> readHeaders(final HttpRequest request) {
+    MultiMap<String, String> headers = new MultiMap<>();
     for (String headerName : request.getHeaderNames()) {
       headers.put(headerName, request.getHeaderValues(headerName));
     }
