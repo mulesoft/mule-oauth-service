@@ -184,7 +184,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
                       new TypedValue(body, DataType.builder().fromObject(body)
                           .mediaType(responseContentType).build()))
 
-          .addBinding("attributes", new TypedValue(Collections.singletonMap("headers", headers.toImmutableParameterMap()),
+          .addBinding("attributes", new TypedValue(Collections.singletonMap("headers", headers.toImmutableMultiMap()),
                                                    DataType.builder()
                                                        .mapType(MultiMap.class)
                                                        .keyType(String.class)
@@ -207,8 +207,8 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
       return (T) expr;
     } else {
       Map<Object, Object> attributes = new HashMap<>(2);
-      attributes.put("headers", headers.toImmutableParameterMap());
-      attributes.put("queryParams", queryParams.toImmutableParameterMap());
+      attributes.put("headers", headers.toImmutableMultiMap());
+      attributes.put("queryParams", queryParams.toImmutableMultiMap());
 
       BindingContext resultContext = BindingContext.builder()
           .addBinding("payload",
