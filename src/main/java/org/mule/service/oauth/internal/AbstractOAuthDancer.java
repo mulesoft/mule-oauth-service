@@ -6,6 +6,7 @@
  */
 package org.mule.service.oauth.internal;
 
+import static java.util.Collections.singletonMap;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.mule.runtime.api.metadata.DataType.STRING;
 import static org.mule.runtime.api.metadata.MediaType.ANY;
@@ -27,9 +28,9 @@ import org.mule.runtime.api.lock.LockFactory;
 import org.mule.runtime.api.metadata.DataType;
 import org.mule.runtime.api.metadata.MediaType;
 import org.mule.runtime.api.metadata.TypedValue;
+import org.mule.runtime.api.util.MultiMap;
 import org.mule.runtime.core.api.util.IOUtils;
 import org.mule.runtime.http.api.client.HttpClient;
-import org.mule.runtime.api.util.MultiMap;
 import org.mule.runtime.http.api.domain.entity.ByteArrayHttpEntity;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
 import org.mule.runtime.http.api.domain.message.request.HttpRequestBuilder;
@@ -42,7 +43,6 @@ import org.mule.service.oauth.internal.state.TokenResponse;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -184,12 +184,8 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
                       new TypedValue(body, DataType.builder().fromObject(body)
                           .mediaType(responseContentType).build()))
 
-          .addBinding("attributes", new TypedValue(Collections.singletonMap("headers", headers.toImmutableMultiMap()),
-                                                   DataType.builder()
-                                                       .mapType(MultiMap.class)
-                                                       .keyType(String.class)
-                                                       .valueType(String.class)
-                                                       .build()))
+          .addBinding("attributes", new TypedValue(singletonMap("headers", headers.toImmutableMultiMap()),
+                                                   DataType.fromType(Map.class)))
           .addBinding("dataType",
                       new TypedValue(DataType.builder().fromObject(body).mediaType(responseContentType)
                           .build(), DataType.fromType(DataType.class)))
