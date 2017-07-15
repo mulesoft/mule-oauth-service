@@ -32,18 +32,16 @@ import static org.mule.runtime.http.api.HttpConstants.Method.GET;
 import static org.mule.service.oauth.internal.OAuthConstants.CODE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.STATE_PARAMETER;
 import static org.mule.service.oauth.internal.state.StateEncoder.RESOURCE_OWNER_PARAM_NAME_ASSIGN;
-
-import org.mule.runtime.api.connection.ConnectionException;
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.lifecycle.InitialisationException;
 import org.mule.runtime.api.lock.LockFactory;
+import org.mule.runtime.api.util.MultiMap;
 import org.mule.runtime.core.api.registry.RegistrationException;
 import org.mule.runtime.core.api.scheduler.SchedulerService;
 import org.mule.runtime.http.api.HttpService;
 import org.mule.runtime.http.api.client.HttpClient;
 import org.mule.runtime.http.api.client.HttpClientFactory;
-import org.mule.runtime.api.util.MultiMap;
 import org.mule.runtime.http.api.domain.entity.InputStreamHttpEntity;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
 import org.mule.runtime.http.api.domain.message.response.HttpResponse;
@@ -69,7 +67,6 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -90,7 +87,7 @@ public class DancerConfigTestCase extends AbstractMuleContextTestCase {
   private ArgumentCaptor<RequestHandler> requestHandlerCaptor = forClass(RequestHandler.class);
 
   @Before
-  public void before() throws ConnectionException, IOException, TimeoutException {
+  public void before() throws Exception {
     final HttpService httpService = mock(HttpService.class);
     final HttpClientFactory httpClientFactory = mock(HttpClientFactory.class);
     httpClient = mock(HttpClient.class);

@@ -17,7 +17,6 @@ import org.mule.runtime.http.api.client.HttpClient;
 import org.mule.runtime.http.api.client.HttpClientConfiguration;
 import org.mule.runtime.http.api.client.HttpClientConfiguration.Builder;
 import org.mule.runtime.http.api.client.HttpRequestAuthentication;
-import org.mule.runtime.http.api.client.async.ResponseHandler;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
 import org.mule.runtime.http.api.domain.message.response.HttpResponse;
 import org.mule.runtime.oauth.api.builder.OAuthDancerBuilder;
@@ -26,6 +25,7 @@ import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -91,10 +91,9 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
       }
 
       @Override
-      public void send(HttpRequest request, int responseTimeout, boolean followRedirects,
-                       HttpRequestAuthentication authentication,
-                       ResponseHandler handler) {
-        httpClient.send(request, responseTimeout, followRedirects, authentication, handler);
+      public CompletableFuture<HttpResponse> sendAsync(HttpRequest request, int responseTimeout, boolean followRedirects,
+                                                       HttpRequestAuthentication authentication) {
+        return httpClient.sendAsync(request, responseTimeout, followRedirects, authentication);
       }
 
       @Override

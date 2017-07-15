@@ -12,7 +12,6 @@ import static java.util.Optional.empty;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.mule.runtime.api.util.Preconditions.checkArgument;
 
-import org.mule.runtime.api.connection.ConnectionException;
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.lock.LockFactory;
@@ -21,6 +20,7 @@ import org.mule.runtime.core.api.scheduler.SchedulerService;
 import org.mule.runtime.http.api.HttpService;
 import org.mule.runtime.http.api.server.HttpServer;
 import org.mule.runtime.http.api.server.HttpServerConfiguration;
+import org.mule.runtime.http.api.server.ServerCreationException;
 import org.mule.runtime.oauth.api.AuthorizationCodeOAuthDancer;
 import org.mule.runtime.oauth.api.AuthorizationCodeRequest;
 import org.mule.runtime.oauth.api.builder.AuthorizationCodeDanceCallbackContext;
@@ -68,7 +68,7 @@ public class DefaultOAuthAuthorizationCodeDancerBuilder extends AbstractOAuthDan
           .setName(localCallbackUrl.toString());
       try {
         return httpService.getServerFactory().create(serverConfigBuilder.build());
-      } catch (ConnectionException e) {
+      } catch (ServerCreationException e) {
         throw new MuleRuntimeException(e);
       }
     };
@@ -86,7 +86,7 @@ public class DefaultOAuthAuthorizationCodeDancerBuilder extends AbstractOAuthDan
       serverConfigBuilder.setTlsContextFactory(tlsContextFactory);
       try {
         return httpService.getServerFactory().create(serverConfigBuilder.build());
-      } catch (ConnectionException e) {
+      } catch (ServerCreationException e) {
         throw new MuleRuntimeException(e);
       }
     };
