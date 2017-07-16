@@ -40,9 +40,9 @@ import java.util.concurrent.TimeoutException;
 import org.junit.Before;
 import org.junit.Test;
 
-import ru.yandex.qatools.allure.annotations.Features;
+import io.qameta.allure.Feature;
 
-@Features("OAuth Service")
+@Feature("OAuth Service")
 public class OAuthContextTestCase extends AbstractMuleContextTestCase {
 
   private OAuthService service;

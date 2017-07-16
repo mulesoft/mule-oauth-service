@@ -78,9 +78,9 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 
-import ru.yandex.qatools.allure.annotations.Features;
+import io.qameta.allure.Feature;
 
-@Features("OAuth Service")
+@Feature("OAuth Service")
 public class DancerConfigTestCase extends AbstractMuleContextTestCase {
 
   private OAuthService service;
