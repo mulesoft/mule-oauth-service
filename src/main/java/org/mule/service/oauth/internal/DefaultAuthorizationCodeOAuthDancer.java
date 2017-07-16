@@ -175,9 +175,9 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
   private static void sendErrorResponse(final HttpConstants.HttpStatus status, String message,
                                         HttpResponseReadyCallback responseCallback) {
     responseCallback.responseReady(HttpResponse.builder()
-        .setStatusCode(status.getStatusCode())
-        .setReasonPhrase(status.getReasonPhrase())
-        .setEntity(message != null ? new ByteArrayHttpEntity(message.getBytes()) : new EmptyHttpEntity())
+        .statusCode(status.getStatusCode())
+        .reasonPhrase(status.getReasonPhrase())
+        .entity(message != null ? new ByteArrayHttpEntity(message.getBytes()) : new EmptyHttpEntity())
         .addHeader(CONTENT_LENGTH, message != null ? valueOf(message.length()) : "0")
         .build(), new ResponseStatusCallback() {
 
@@ -286,9 +286,9 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
   private static void sendResponse(HttpResponseReadyCallback responseCallback, HttpStatus status, String message,
                                    String locationHeader) {
     HttpResponseBuilder httpResponseBuilder = HttpResponse.builder();
-    httpResponseBuilder.setStatusCode(status.getStatusCode());
-    httpResponseBuilder.setReasonPhrase(status.getReasonPhrase());
-    httpResponseBuilder.setEntity(new ByteArrayHttpEntity(message.getBytes()));
+    httpResponseBuilder.statusCode(status.getStatusCode());
+    httpResponseBuilder.reasonPhrase(status.getReasonPhrase());
+    httpResponseBuilder.entity(new ByteArrayHttpEntity(message.getBytes()));
     httpResponseBuilder.addHeader(CONTENT_LENGTH, valueOf(message.length()));
     httpResponseBuilder.addHeader(LOCATION, locationHeader);
     responseCallback.responseReady(httpResponseBuilder.build(), new ResponseStatusCallback() {
@@ -308,9 +308,9 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
 
   private static void sendResponse(HttpResponseReadyCallback responseCallback, HttpStatus status, String message) {
     HttpResponseBuilder httpResponseBuilder = HttpResponse.builder();
-    httpResponseBuilder.setStatusCode(status.getStatusCode());
-    httpResponseBuilder.setReasonPhrase(status.getReasonPhrase());
-    httpResponseBuilder.setEntity(new ByteArrayHttpEntity(message.getBytes()));
+    httpResponseBuilder.statusCode(status.getStatusCode());
+    httpResponseBuilder.reasonPhrase(status.getReasonPhrase());
+    httpResponseBuilder.entity(new ByteArrayHttpEntity(message.getBytes()));
     httpResponseBuilder.addHeader(CONTENT_LENGTH, valueOf(message.length()));
     responseCallback.responseReady(httpResponseBuilder.build(), new ResponseStatusCallback() {
 

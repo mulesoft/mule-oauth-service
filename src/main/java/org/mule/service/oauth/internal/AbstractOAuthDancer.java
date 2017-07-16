@@ -113,8 +113,8 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
       throws TokenUrlResponseException, TokenNotFoundException {
     try {
       final HttpRequestBuilder requestBuilder = HttpRequest.builder()
-          .setUri(tokenUrl).setMethod(POST.name())
-          .setEntity(new ByteArrayHttpEntity(encodeString(tokenRequestFormToSend, encoding).getBytes()))
+          .uri(tokenUrl).method(POST.name())
+          .entity(new ByteArrayHttpEntity(encodeString(tokenRequestFormToSend, encoding).getBytes()))
           .addHeader(CONTENT_TYPE, APPLICATION_X_WWW_FORM_URLENCODED.toRfcString());
 
       if (authorization != null) {
