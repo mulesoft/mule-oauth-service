@@ -18,6 +18,7 @@ import static org.mule.runtime.http.api.HttpHeaders.Names.CONTENT_TYPE;
 import static org.mule.runtime.http.api.HttpHeaders.Values.APPLICATION_X_WWW_FORM_URLENCODED;
 import static org.mule.runtime.http.api.utils.HttpEncoderDecoderUtils.encodeString;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
+
 import org.mule.runtime.api.el.BindingContext;
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.MuleException;
@@ -134,7 +135,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
       String body = IOUtils.toString(response.getEntity().getContent());
 
       if (response.getStatusCode() >= BAD_REQUEST.getStatusCode()) {
-        throw new TokenUrlResponseException(tokenUrl);
+        throw new TokenUrlResponseException(tokenUrl, response, body);
       }
 
       TokenResponse tokenResponse = new TokenResponse();
@@ -142,7 +143,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
       tokenResponse
           .setAccessToken(resolveExpression(responseAccessTokenExpr, body, headers, responseContentType));
       if (tokenResponse.getAccessToken() == null) {
-        throw new TokenNotFoundException(body);
+        throw new TokenNotFoundException(tokenUrl, response, body);
       }
       if (retrieveRefreshToken) {
         tokenResponse
