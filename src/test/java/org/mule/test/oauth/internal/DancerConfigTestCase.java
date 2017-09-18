@@ -32,13 +32,14 @@ import static org.mule.runtime.http.api.HttpConstants.Method.GET;
 import static org.mule.service.oauth.internal.OAuthConstants.CODE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.STATE_PARAMETER;
 import static org.mule.service.oauth.internal.state.StateEncoder.RESOURCE_OWNER_PARAM_NAME_ASSIGN;
+
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.lifecycle.InitialisationException;
 import org.mule.runtime.api.lock.LockFactory;
+import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.runtime.api.util.MultiMap;
 import org.mule.runtime.core.api.registry.RegistrationException;
-import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.runtime.http.api.HttpService;
 import org.mule.runtime.http.api.client.HttpClient;
 import org.mule.runtime.http.api.client.HttpClientFactory;
@@ -61,6 +62,11 @@ import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 import org.mule.service.oauth.internal.DefaultOAuthService;
 import org.mule.tck.junit4.AbstractMuleContextTestCase;
 
+import org.apache.commons.io.input.ReaderInputStream;
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.ArgumentCaptor;
+
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.MalformedURLException;
@@ -70,10 +76,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.commons.io.input.ReaderInputStream;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.ArgumentCaptor;
+import javax.inject.Inject;
 
 import io.qameta.allure.Feature;
 
@@ -83,6 +86,18 @@ public class DancerConfigTestCase extends AbstractMuleContextTestCase {
   private OAuthService service;
   private HttpClient httpClient;
   private HttpServer httpServer;
+
+  @Inject
+  private LockFactory lockFactory;
+
+  public DancerConfigTestCase() {
+    setStartContext(true);
+  }
+
+  @Override
+  protected boolean doTestClassInjection() {
+    return true;
+  }
 
   private ArgumentCaptor<RequestHandler> requestHandlerCaptor = forClass(RequestHandler.class);
 
@@ -362,7 +377,6 @@ public class DancerConfigTestCase extends AbstractMuleContextTestCase {
 
   @Test
   public void multipleDancersShareTokensStore() throws MalformedURLException, InitialisationException, MuleException {
-    final LockFactory lockFactory = muleContext.getRegistry().lookupObject(LockFactory.class);
     final Map<String, Object> tokensStore = new HashMap<>();
     final MuleExpressionLanguage el = mock(MuleExpressionLanguage.class);
 
@@ -394,8 +408,7 @@ public class DancerConfigTestCase extends AbstractMuleContextTestCase {
 
   private OAuthClientCredentialsDancerBuilder baseClientCredentialsDancerBuilder() throws RegistrationException {
     final OAuthClientCredentialsDancerBuilder builder =
-        service.clientCredentialsGrantTypeDancerBuilder(muleContext.getRegistry().lookupObject(LockFactory.class),
-                                                        new HashMap<>(), mock(MuleExpressionLanguage.class));
+        service.clientCredentialsGrantTypeDancerBuilder(lockFactory, new HashMap<>(), mock(MuleExpressionLanguage.class));
 
     builder.clientCredentials("clientId", "clientSecret");
     return builder;
@@ -403,8 +416,7 @@ public class DancerConfigTestCase extends AbstractMuleContextTestCase {
 
   private OAuthAuthorizationCodeDancerBuilder baseAuthCodeDancerbuilder() throws RegistrationException {
     final OAuthAuthorizationCodeDancerBuilder builder =
-        service.authorizationCodeGrantTypeDancerBuilder(muleContext.getRegistry().lookupObject(LockFactory.class),
-                                                        new HashMap<>(), mock(MuleExpressionLanguage.class));
+        service.authorizationCodeGrantTypeDancerBuilder(lockFactory, new HashMap<>(), mock(MuleExpressionLanguage.class));
 
     builder.clientCredentials("clientId", "clientSecret");
     return builder;

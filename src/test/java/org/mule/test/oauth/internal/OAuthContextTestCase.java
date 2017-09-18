@@ -32,13 +32,15 @@ import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
 import org.mule.service.oauth.internal.DefaultOAuthService;
 import org.mule.tck.junit4.AbstractMuleContextTestCase;
 
+import org.junit.Before;
+import org.junit.Test;
+
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
-import org.junit.Before;
-import org.junit.Test;
+import javax.inject.Inject;
 
 import io.qameta.allure.Feature;
 
@@ -47,6 +49,18 @@ public class OAuthContextTestCase extends AbstractMuleContextTestCase {
 
   private OAuthService service;
   private Map<String, ResourceOwnerOAuthContext> tokensStore;
+
+  @Inject
+  private LockFactory lockFactory;
+
+  public OAuthContextTestCase() {
+    setStartContext(true);
+  }
+
+  @Override
+  protected boolean doTestClassInjection() {
+    return true;
+  }
 
   @Before
   public void before() throws ConnectionException, IOException, TimeoutException {
@@ -159,8 +173,7 @@ public class OAuthContextTestCase extends AbstractMuleContextTestCase {
 
   private OAuthClientCredentialsDancerBuilder baseClientCredentialsDancerBuilder() throws Exception {
     final OAuthClientCredentialsDancerBuilder builder =
-        service.clientCredentialsGrantTypeDancerBuilder(muleContext.getRegistry().lookupObject(LockFactory.class),
-                                                        tokensStore, mock(MuleExpressionLanguage.class));
+        service.clientCredentialsGrantTypeDancerBuilder(lockFactory, tokensStore, mock(MuleExpressionLanguage.class));
 
     builder.clientCredentials("clientId", "clientSecret");
     builder.tokenUrl(mock(HttpClient.class), "http://host/token");
@@ -169,8 +182,7 @@ public class OAuthContextTestCase extends AbstractMuleContextTestCase {
 
   private OAuthAuthorizationCodeDancerBuilder baseAuthCodeDancerbuilder() throws Exception {
     final OAuthAuthorizationCodeDancerBuilder builder =
-        service.authorizationCodeGrantTypeDancerBuilder(muleContext.getRegistry().lookupObject(LockFactory.class),
-                                                        tokensStore, mock(MuleExpressionLanguage.class));
+        service.authorizationCodeGrantTypeDancerBuilder(lockFactory, tokensStore, mock(MuleExpressionLanguage.class));
 
     builder.clientCredentials("clientId", "clientSecret");
     builder.tokenUrl(mock(HttpClient.class), "http://host/token");
