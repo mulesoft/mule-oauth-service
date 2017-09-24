@@ -39,7 +39,6 @@ import org.mule.runtime.api.lifecycle.InitialisationException;
 import org.mule.runtime.api.lock.LockFactory;
 import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.runtime.api.util.MultiMap;
-import org.mule.runtime.core.api.registry.RegistrationException;
 import org.mule.runtime.http.api.HttpService;
 import org.mule.runtime.http.api.client.HttpClient;
 import org.mule.runtime.http.api.client.HttpClientFactory;
@@ -406,7 +405,7 @@ public class DancerConfigTestCase extends AbstractMuleContextTestCase {
     assertThat(dancer2.getContextForResourceOwner("owner"), sameInstance(contextOwnerConn2));
   }
 
-  private OAuthClientCredentialsDancerBuilder baseClientCredentialsDancerBuilder() throws RegistrationException {
+  private OAuthClientCredentialsDancerBuilder baseClientCredentialsDancerBuilder() {
     final OAuthClientCredentialsDancerBuilder builder =
         service.clientCredentialsGrantTypeDancerBuilder(lockFactory, new HashMap<>(), mock(MuleExpressionLanguage.class));
 
@@ -414,7 +413,7 @@ public class DancerConfigTestCase extends AbstractMuleContextTestCase {
     return builder;
   }
 
-  private OAuthAuthorizationCodeDancerBuilder baseAuthCodeDancerbuilder() throws RegistrationException {
+  private OAuthAuthorizationCodeDancerBuilder baseAuthCodeDancerbuilder() {
     final OAuthAuthorizationCodeDancerBuilder builder =
         service.authorizationCodeGrantTypeDancerBuilder(lockFactory, new HashMap<>(), mock(MuleExpressionLanguage.class));
 
