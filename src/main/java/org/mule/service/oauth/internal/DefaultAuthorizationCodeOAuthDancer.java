@@ -40,21 +40,22 @@ import static org.mule.service.oauth.internal.OAuthConstants.REDIRECT_URI_PARAME
 import static org.mule.service.oauth.internal.OAuthConstants.REFRESH_TOKEN_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.STATE_PARAMETER;
 import static org.slf4j.LoggerFactory.getLogger;
+
 import org.mule.runtime.api.el.MuleExpressionLanguage;
+import org.mule.runtime.api.exception.DefaultMuleException;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.lifecycle.InitialisationException;
 import org.mule.runtime.api.lifecycle.Lifecycle;
 import org.mule.runtime.api.lock.LockFactory;
 import org.mule.runtime.api.metadata.MediaType;
-import org.mule.runtime.api.exception.DefaultMuleException;
+import org.mule.runtime.api.util.MultiMap;
 import org.mule.runtime.core.api.util.IOUtils;
 import org.mule.runtime.core.api.util.StringUtils;
 import org.mule.runtime.http.api.HttpConstants;
 import org.mule.runtime.http.api.HttpConstants.HttpStatus;
 import org.mule.runtime.http.api.HttpConstants.Method;
 import org.mule.runtime.http.api.client.HttpClient;
-import org.mule.runtime.api.util.MultiMap;
 import org.mule.runtime.http.api.domain.entity.ByteArrayHttpEntity;
 import org.mule.runtime.http.api.domain.entity.EmptyHttpEntity;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
@@ -79,27 +80,28 @@ import org.mule.service.oauth.internal.state.StateDecoder;
 import org.mule.service.oauth.internal.state.StateEncoder;
 import org.mule.service.oauth.internal.state.TokenResponse;
 
+import org.slf4j.Logger;
+
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import org.slf4j.Logger;
-
 /**
  * Provides OAuth dance support for authorization-code grant-type.
- * 
+ *
  * @since 1.0
  */
 public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer implements AuthorizationCodeOAuthDancer, Lifecycle {
 
   private static final Logger LOGGER = getLogger(DefaultAuthorizationCodeOAuthDancer.class);
 
-  private final HttpServer httpServer;
+  private final Optional<HttpServer> httpServer;
 
   private final String localCallbackUrlPath;
 
@@ -118,7 +120,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
   private RequestHandlerManager redirectUrlHandlerManager;
   private RequestHandlerManager localAuthorizationUrlHandlerManager;
 
-  public DefaultAuthorizationCodeOAuthDancer(HttpServer httpServer, String clientId, String clientSecret,
+  public DefaultAuthorizationCodeOAuthDancer(Optional<HttpServer> httpServer, String clientId, String clientSecret,
                                              String tokenUrl, String scopes, String externalCallbackUrl, Charset encoding,
                                              String localCallbackUrlPath, String localAuthorizationUrlPath,
                                              String localAuthorizationUrlResourceOwnerId, String state, String authorizationUrl,
@@ -149,9 +151,11 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
 
   @Override
   public void initialise() throws InitialisationException {
-    redirectUrlHandlerManager = addRequestHandler(httpServer, GET, localCallbackUrlPath, createRedirectUrlListener());
-    localAuthorizationUrlHandlerManager =
-        addRequestHandler(httpServer, GET, localAuthorizationUrlPath, createLocalAuthorizationUrlListener());
+    httpServer.ifPresent(s -> {
+      redirectUrlHandlerManager = addRequestHandler(s, GET, localCallbackUrlPath, createRedirectUrlListener());
+      localAuthorizationUrlHandlerManager =
+          addRequestHandler(s, GET, localAuthorizationUrlPath, createLocalAuthorizationUrlListener());
+    });
   }
 
   private static RequestHandlerManager addRequestHandler(HttpServer server, Method method, String path,
@@ -390,28 +394,34 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
   @Override
   public void start() throws MuleException {
     super.start();
-    try {
-      httpServer.start();
-    } catch (IOException e) {
-      throw new DefaultMuleException(e);
+    if (httpServer.isPresent()) {
+      try {
+        httpServer.get().start();
+      } catch (IOException e) {
+        throw new DefaultMuleException(e);
+      }
+      redirectUrlHandlerManager.start();
+      localAuthorizationUrlHandlerManager.start();
     }
-    redirectUrlHandlerManager.start();
-    localAuthorizationUrlHandlerManager.start();
   }
 
   @Override
   public void stop() throws MuleException {
-    redirectUrlHandlerManager.stop();
-    localAuthorizationUrlHandlerManager.stop();
-    httpServer.stop();
+    if (httpServer.isPresent()) {
+      redirectUrlHandlerManager.stop();
+      localAuthorizationUrlHandlerManager.stop();
+      httpServer.get().stop();
+    }
     super.stop();
   }
 
   @Override
   public void dispose() {
-    redirectUrlHandlerManager.dispose();
-    localAuthorizationUrlHandlerManager.dispose();
-    httpServer.dispose();
+    if (httpServer.isPresent()) {
+      redirectUrlHandlerManager.dispose();
+      localAuthorizationUrlHandlerManager.dispose();
+      httpServer.get().dispose();
+    }
   }
 
   @Override

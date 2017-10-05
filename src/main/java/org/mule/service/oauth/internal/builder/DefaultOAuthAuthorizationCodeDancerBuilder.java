@@ -9,14 +9,15 @@ package org.mule.service.oauth.internal.builder;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.Optional.empty;
+import static java.util.Optional.of;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.mule.runtime.api.util.Preconditions.checkArgument;
 
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.lock.LockFactory;
-import org.mule.runtime.api.tls.TlsContextFactory;
 import org.mule.runtime.api.scheduler.SchedulerService;
+import org.mule.runtime.api.tls.TlsContextFactory;
 import org.mule.runtime.http.api.HttpService;
 import org.mule.runtime.http.api.server.HttpServer;
 import org.mule.runtime.http.api.server.HttpServerConfiguration;
@@ -31,6 +32,7 @@ import org.mule.service.oauth.internal.DefaultAuthorizationCodeOAuthDancer;
 
 import java.net.URL;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -166,9 +168,10 @@ public class DefaultOAuthAuthorizationCodeDancerBuilder extends AbstractOAuthDan
     checkArgument(isNotBlank(clientSecret), "clientSecret cannot be blank");
     checkArgument(isNotBlank(tokenUrl), "tokenUrl cannot be blank");
     checkArgument(isNotBlank(authorizationUrl), "authorizationUrl cannot be blank");
-    requireNonNull(localCallbackServerFactory, "localCallback must be configured");
 
-    return new DefaultAuthorizationCodeOAuthDancer(localCallbackServerFactory.get(), clientId, clientSecret,
+    Optional<HttpServer> httpServer = localCallbackServerFactory != null ? of(localCallbackServerFactory.get()) : empty();
+
+    return new DefaultAuthorizationCodeOAuthDancer(httpServer, clientId, clientSecret,
                                                    tokenUrl, scopes, externalCallbackUrl, encoding, localCallbackUrlPath,
                                                    localAuthorizationUrlPath, localAuthorizationUrlResourceOwnerId, state,
                                                    authorizationUrl, responseAccessTokenExpr, responseRefreshTokenExpr,
