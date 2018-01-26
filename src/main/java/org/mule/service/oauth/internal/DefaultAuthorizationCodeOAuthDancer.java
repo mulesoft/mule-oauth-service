@@ -379,11 +379,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
   }
 
   private MultiMap<String, String> readHeaders(final HttpRequest request) {
-    MultiMap<String, String> headers = new MultiMap<>();
-    for (String headerName : request.getHeaderNames()) {
-      headers.put(headerName, request.getHeaderValues(headerName));
-    }
-    return headers;
+    return request.getHeaders();
   }
 
   private MediaType getMediaType(final HttpRequest request) {

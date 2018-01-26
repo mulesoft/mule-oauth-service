@@ -127,10 +127,6 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
 
       MediaType responseContentType =
           response.getHeaderValueIgnoreCase(CONTENT_TYPE) != null ? parse(response.getHeaderValueIgnoreCase(CONTENT_TYPE)) : ANY;
-      MultiMap<String, String> headers = new MultiMap<>();
-      for (String headerName : response.getHeaderNames()) {
-        headers.put(headerName, response.getHeaderValues(headerName));
-      }
 
       String body = IOUtils.toString(response.getEntity().getContent());
 
@@ -138,8 +134,9 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
         throw new TokenUrlResponseException(tokenUrl, response, body);
       }
 
-      TokenResponse tokenResponse = new TokenResponse();
+      MultiMap<String, String> headers = response.getHeaders();
 
+      TokenResponse tokenResponse = new TokenResponse();
       tokenResponse
           .setAccessToken(resolveExpression(responseAccessTokenExpr, body, headers, responseContentType));
       if (tokenResponse.getAccessToken() == null) {
