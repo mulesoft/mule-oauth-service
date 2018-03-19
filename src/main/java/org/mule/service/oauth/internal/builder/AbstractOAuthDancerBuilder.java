@@ -8,7 +8,6 @@ package org.mule.service.oauth.internal.builder;
 
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
-
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.lock.LockFactory;
 import org.mule.runtime.api.tls.TlsContextFactory;
@@ -16,7 +15,7 @@ import org.mule.runtime.http.api.HttpService;
 import org.mule.runtime.http.api.client.HttpClient;
 import org.mule.runtime.http.api.client.HttpClientConfiguration;
 import org.mule.runtime.http.api.client.HttpClientConfiguration.Builder;
-import org.mule.runtime.http.api.client.auth.HttpAuthentication;
+import org.mule.runtime.http.api.client.HttpRequestOptions;
 import org.mule.runtime.http.api.client.proxy.ProxyConfig;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
 import org.mule.runtime.http.api.domain.message.response.HttpResponse;
@@ -92,16 +91,14 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
       }
 
       @Override
-      public CompletableFuture<HttpResponse> sendAsync(HttpRequest request, int responseTimeout, boolean followRedirects,
-                                                       HttpAuthentication authentication) {
-        return httpClient.sendAsync(request, responseTimeout, followRedirects, authentication);
+      public CompletableFuture<HttpResponse> sendAsync(HttpRequest request, HttpRequestOptions options) {
+        return httpClient.sendAsync(request, options);
       }
 
       @Override
-      public HttpResponse send(HttpRequest request, int responseTimeout, boolean followRedirects,
-                               HttpAuthentication authentication)
+      public HttpResponse send(HttpRequest request, HttpRequestOptions options)
           throws IOException, TimeoutException {
-        return httpClient.send(request, responseTimeout, followRedirects, authentication);
+        return httpClient.send(request, options);
       }
     };
 
