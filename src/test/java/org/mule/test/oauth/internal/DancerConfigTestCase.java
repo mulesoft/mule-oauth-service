@@ -17,8 +17,6 @@ import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
-import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
@@ -32,7 +30,6 @@ import static org.mule.runtime.http.api.HttpConstants.Method.GET;
 import static org.mule.service.oauth.internal.OAuthConstants.CODE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.STATE_PARAMETER;
 import static org.mule.service.oauth.internal.state.StateEncoder.RESOURCE_OWNER_PARAM_NAME_ASSIGN;
-
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.lifecycle.InitialisationException;
@@ -61,11 +58,6 @@ import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 import org.mule.service.oauth.internal.DefaultOAuthService;
 import org.mule.tck.junit4.AbstractMuleContextTestCase;
 
-import org.apache.commons.io.input.ReaderInputStream;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.ArgumentCaptor;
-
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.MalformedURLException;
@@ -78,6 +70,10 @@ import java.util.concurrent.locks.ReentrantLock;
 import javax.inject.Inject;
 
 import io.qameta.allure.Feature;
+import org.apache.commons.io.input.ReaderInputStream;
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 
 @Feature("OAuth Service")
 public class DancerConfigTestCase extends AbstractMuleContextTestCase {
@@ -122,7 +118,7 @@ public class DancerConfigTestCase extends AbstractMuleContextTestCase {
     final InputStreamHttpEntity httpEntity = mock(InputStreamHttpEntity.class);
     when(httpEntity.getContent()).thenReturn(new ReaderInputStream(new StringReader("")));
     when(httpResponse.getEntity()).thenReturn(httpEntity);
-    when(httpClient.send(any(), anyInt(), anyBoolean(), any())).thenReturn(httpResponse);
+    when(httpClient.send(any(), any())).thenReturn(httpResponse);
   }
 
   @Test
