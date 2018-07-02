@@ -383,7 +383,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
   }
 
   private MediaType getMediaType(final HttpRequest request) {
-    String contentType = request.getHeaderValueIgnoreCase(CONTENT_TYPE);
+    String contentType = request.getHeaderValue(CONTENT_TYPE);
     return contentType != null ? parse(contentType) : ANY;
   }
 

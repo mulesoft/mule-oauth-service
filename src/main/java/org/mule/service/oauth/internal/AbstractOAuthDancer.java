@@ -127,8 +127,8 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
           .responseTimeout(TOKEN_REQUEST_TIMEOUT_MILLIS)
           .build());
 
-      MediaType responseContentType =
-          response.getHeaderValueIgnoreCase(CONTENT_TYPE) != null ? parse(response.getHeaderValueIgnoreCase(CONTENT_TYPE)) : ANY;
+      String contentType = response.getHeaderValue(CONTENT_TYPE);
+      MediaType responseContentType = contentType != null ? parse(contentType) : ANY;
 
       String body = IOUtils.toString(response.getEntity().getContent());
 
