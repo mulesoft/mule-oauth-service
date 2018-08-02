@@ -33,6 +33,8 @@ import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
 import org.mule.service.oauth.internal.state.TokenResponse;
 
+import org.slf4j.Logger;
+
 import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
@@ -41,11 +43,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 
-import org.slf4j.Logger;
-
 /**
  * Provides OAuth dance support for client-credentials grant-type.
- * 
+ *
  * @since 1.0
  */
 public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer implements Startable, ClientCredentialsOAuthDancer {
@@ -53,6 +53,8 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
   private static final Logger LOGGER = getLogger(DefaultClientCredentialsOAuthDancer.class);
 
   private final boolean encodeClientCredentialsInBody;
+
+  private boolean accessTokenRefreshedOnStart = false;
 
   public DefaultClientCredentialsOAuthDancer(String clientId, String clientSecret, String tokenUrl, String scopes,
                                              boolean encodeClientCredentialsInBody, Charset encoding,
@@ -72,9 +74,13 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
     super.start();
     try {
       refreshToken().get();
+      accessTokenRefreshedOnStart = true;
     } catch (ExecutionException e) {
-      super.stop();
-      throw new LifecycleException(e.getCause(), this);
+      if (!(e.getCause() instanceof TokenUrlResponseException) && !(e.getCause() instanceof TokenNotFoundException)) {
+        super.stop();
+        throw new LifecycleException(e.getCause(), this);
+      }
+      // else nothing to do, accessTokenRefreshedOnStart remains false and this is called later
     } catch (InterruptedException e) {
       super.stop();
       currentThread().interrupt();
@@ -84,6 +90,22 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
 
   @Override
   public CompletableFuture<String> accessToken() throws RequestAuthenticationException {
+    if (!accessTokenRefreshedOnStart) {
+      accessTokenRefreshedOnStart = true;
+      try {
+        refreshToken().get();
+      } catch (InterruptedException e) {
+        currentThread().interrupt();
+        final CompletableFuture<String> exceptionFuture = new CompletableFuture<>();
+        exceptionFuture.completeExceptionally(e);
+        return exceptionFuture;
+      } catch (ExecutionException e) {
+        final CompletableFuture<String> exceptionFuture = new CompletableFuture<>();
+        exceptionFuture.completeExceptionally(e.getCause());
+        return exceptionFuture;
+      }
+    }
+
     final String accessToken = getContext().getAccessToken();
     if (accessToken == null) {
       throw new RequestAuthenticationException(createStaticMessage(format("No access token found. "
