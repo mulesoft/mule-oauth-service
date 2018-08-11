@@ -39,6 +39,7 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
 
   protected String clientId;
   protected String clientSecret;
+  protected boolean encodeClientCredentialsInBody = false;
   protected String tokenUrl;
   protected Supplier<HttpClient> httpClientFactory;
 
@@ -62,6 +63,11 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
   public OAuthDancerBuilder clientCredentials(String clientId, String clientSecret) {
     this.clientId = clientId;
     this.clientSecret = clientSecret;
+    return this;
+  }
+
+  public OAuthDancerBuilder encodeClientCredentialsInBody(boolean encodeClientCredentialsInBody) {
+    this.encodeClientCredentialsInBody = encodeClientCredentialsInBody;
     return this;
   }
 

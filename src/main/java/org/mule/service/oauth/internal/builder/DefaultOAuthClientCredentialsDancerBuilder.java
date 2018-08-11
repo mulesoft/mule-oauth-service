@@ -23,8 +23,6 @@ import java.util.Map;
 public class DefaultOAuthClientCredentialsDancerBuilder extends AbstractOAuthDancerBuilder<ClientCredentialsOAuthDancer>
     implements OAuthClientCredentialsDancerBuilder {
 
-  private boolean encodeClientCredentialsInBody = false;
-
   public DefaultOAuthClientCredentialsDancerBuilder(LockFactory lockProvider,
                                                     Map<String, DefaultResourceOwnerOAuthContext> tokensStore,
                                                     HttpService httpService,
@@ -34,8 +32,7 @@ public class DefaultOAuthClientCredentialsDancerBuilder extends AbstractOAuthDan
 
   @Override
   public OAuthClientCredentialsDancerBuilder encodeClientCredentialsInBody(boolean encodeClientCredentialsInBody) {
-    this.encodeClientCredentialsInBody = encodeClientCredentialsInBody;
-    return this;
+    return (OAuthClientCredentialsDancerBuilder) super.encodeClientCredentialsInBody(encodeClientCredentialsInBody);
   }
 
   @Override

@@ -30,8 +30,6 @@ import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.NO_AUTHORI
 import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.TOKEN_NOT_FOUND_STATUS;
 import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.TOKEN_URL_CALL_FAILED_STATUS;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
-import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_ID_PARAMETER;
-import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_SECRET_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.CODE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_AUTHENTICATION_CODE;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_PARAMETER;
@@ -121,7 +119,8 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
   private RequestHandlerManager localAuthorizationUrlHandlerManager;
 
   public DefaultAuthorizationCodeOAuthDancer(Optional<HttpServer> httpServer, String clientId, String clientSecret,
-                                             String tokenUrl, String scopes, String externalCallbackUrl, Charset encoding,
+                                             String tokenUrl, String scopes, boolean encodeClientCredentialsInBody,
+                                             String externalCallbackUrl, Charset encoding,
                                              String localCallbackUrlPath, String localAuthorizationUrlPath,
                                              String localAuthorizationUrlResourceOwnerId, String state, String authorizationUrl,
                                              String responseAccessTokenExpr, String responseRefreshTokenExpr,
@@ -132,7 +131,8 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
                                              HttpClient httpClient, MuleExpressionLanguage expressionEvaluator,
                                              Function<AuthorizationCodeRequest, AuthorizationCodeDanceCallbackContext> beforeDanceCallback,
                                              BiConsumer<AuthorizationCodeDanceCallbackContext, ResourceOwnerOAuthContext> afterDanceCallback) {
-    super(clientId, clientSecret, tokenUrl, encoding, scopes, responseAccessTokenExpr, responseRefreshTokenExpr,
+    super(clientId, clientSecret, tokenUrl, encoding, scopes, encodeClientCredentialsInBody, responseAccessTokenExpr,
+          responseRefreshTokenExpr,
           responseExpiresInExpr, customParametersExtractorsExprs, resourceOwnerIdTransformer, lockProvider, tokensStore,
           httpClient, expressionEvaluator);
 
@@ -231,13 +231,12 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
 
       final Map<String, String> formData = new HashMap<>();
       formData.put(CODE_PARAMETER, authorizationCode);
-      formData.put(CLIENT_ID_PARAMETER, clientId);
-      formData.put(CLIENT_SECRET_PARAMETER, clientSecret);
+      String authorization = handleClientCredentials(formData, encodeClientCredentialsInBody);
       formData.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_AUTHENTICATION_CODE);
       formData.put(REDIRECT_URI_PARAMETER, externalCallbackUrl);
 
       try {
-        TokenResponse tokenResponse = invokeTokenUrl(tokenUrl, formData, null, true, encoding);
+        TokenResponse tokenResponse = invokeTokenUrl(tokenUrl, formData, authorization, true, encoding);
 
         final DefaultResourceOwnerOAuthContext resourceOwnerOAuthContext =
             (DefaultResourceOwnerOAuthContext) getContextForResourceOwner(resourceOwnerId == null ? DEFAULT_RESOURCE_OWNER_ID
@@ -450,13 +449,12 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
 
         final Map<String, String> formData = new HashMap<>();
         formData.put(REFRESH_TOKEN_PARAMETER, userRefreshToken);
-        formData.put(CLIENT_ID_PARAMETER, clientId);
-        formData.put(CLIENT_SECRET_PARAMETER, clientSecret);
+        String authorization = handleClientCredentials(formData, encodeClientCredentialsInBody);
         formData.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_REFRESH_TOKEN);
         formData.put(REDIRECT_URI_PARAMETER, externalCallbackUrl);
 
         try {
-          TokenResponse tokenResponse = invokeTokenUrl(tokenUrl, formData, null, true, encoding);
+          TokenResponse tokenResponse = invokeTokenUrl(tokenUrl, formData, authorization, true, encoding);
           if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Update OAuth Context for resourceOwnerId %s", resourceOwnerOAuthContext.getResourceOwnerId());
           }

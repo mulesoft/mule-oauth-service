@@ -163,6 +163,11 @@ public class DefaultOAuthAuthorizationCodeDancerBuilder extends AbstractOAuthDan
   }
 
   @Override
+  public OAuthAuthorizationCodeDancerBuilder encodeClientCredentialsInBody(boolean encodeClientCredentialsInBody) {
+    return (OAuthAuthorizationCodeDancerBuilder) super.encodeClientCredentialsInBody(encodeClientCredentialsInBody);
+  }
+
+  @Override
   public AuthorizationCodeOAuthDancer build() {
     checkArgument(isNotBlank(clientId), "clientId cannot be blank");
     checkArgument(isNotBlank(clientSecret), "clientSecret cannot be blank");
@@ -172,8 +177,9 @@ public class DefaultOAuthAuthorizationCodeDancerBuilder extends AbstractOAuthDan
     Optional<HttpServer> httpServer = localCallbackServerFactory != null ? of(localCallbackServerFactory.get()) : empty();
 
     return new DefaultAuthorizationCodeOAuthDancer(httpServer, clientId, clientSecret,
-                                                   tokenUrl, scopes, externalCallbackUrl, encoding, localCallbackUrlPath,
-                                                   localAuthorizationUrlPath, localAuthorizationUrlResourceOwnerId, state,
+                                                   tokenUrl, scopes, encodeClientCredentialsInBody, externalCallbackUrl, encoding,
+                                                   localCallbackUrlPath, localAuthorizationUrlPath,
+                                                   localAuthorizationUrlResourceOwnerId, state,
                                                    authorizationUrl, responseAccessTokenExpr, responseRefreshTokenExpr,
                                                    responseExpiresInExpr, customParameters, customParametersExtractorsExprs,
                                                    resourceOwnerIdTransformer, lockProvider, tokensStore,

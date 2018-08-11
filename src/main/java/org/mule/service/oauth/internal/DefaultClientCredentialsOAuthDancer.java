@@ -9,11 +9,8 @@ package org.mule.service.oauth.internal;
 import static java.lang.String.format;
 import static java.lang.Thread.currentThread;
 import static java.util.concurrent.CompletableFuture.completedFuture;
-import static org.apache.commons.codec.binary.Base64.encodeBase64String;
 import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
-import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_ID_PARAMETER;
-import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_SECRET_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_CLIENT_CREDENTIALS;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.SCOPE_PARAMETER;
@@ -52,8 +49,6 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
 
   private static final Logger LOGGER = getLogger(DefaultClientCredentialsOAuthDancer.class);
 
-  private final boolean encodeClientCredentialsInBody;
-
   private boolean accessTokenRefreshedOnStart = false;
 
   public DefaultClientCredentialsOAuthDancer(String clientId, String clientSecret, String tokenUrl, String scopes,
@@ -63,10 +58,10 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
                                              Function<String, String> resourceOwnerIdTransformer, LockFactory lockProvider,
                                              Map<String, DefaultResourceOwnerOAuthContext> tokensStore, HttpClient httpClient,
                                              MuleExpressionLanguage expressionEvaluator) {
-    super(clientId, clientSecret, tokenUrl, encoding, scopes, responseAccessTokenExpr, responseRefreshTokenExpr,
-          responseExpiresInExpr, customParametersExprs, resourceOwnerIdTransformer, lockProvider, tokensStore, httpClient,
+    super(clientId, clientSecret, tokenUrl, encoding, scopes, encodeClientCredentialsInBody, responseAccessTokenExpr,
+          responseRefreshTokenExpr, responseExpiresInExpr, customParametersExprs, resourceOwnerIdTransformer, lockProvider,
+          tokensStore, httpClient,
           expressionEvaluator);
-    this.encodeClientCredentialsInBody = encodeClientCredentialsInBody;
   }
 
   @Override
@@ -124,13 +119,7 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
     if (scopes != null) {
       formData.put(SCOPE_PARAMETER, scopes);
     }
-    String authorization = null;
-    if (encodeClientCredentialsInBody) {
-      formData.put(CLIENT_ID_PARAMETER, clientId);
-      formData.put(CLIENT_SECRET_PARAMETER, clientSecret);
-    } else {
-      authorization = "Basic " + encodeBase64String(format("%s:%s", clientId, clientSecret).getBytes());
-    }
+    String authorization = handleClientCredentials(formData, encodeClientCredentialsInBody);
 
     try {
       TokenResponse tokenResponse = invokeTokenUrl(tokenUrl, formData, authorization, false, encoding);
