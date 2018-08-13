@@ -18,19 +18,14 @@ import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT
 
 import org.mule.runtime.api.connection.ConnectionException;
 import org.mule.runtime.api.el.MuleExpressionLanguage;
-import org.mule.runtime.api.lock.LockFactory;
-import org.mule.runtime.api.scheduler.SchedulerService;
-import org.mule.runtime.http.api.HttpService;
 import org.mule.runtime.http.api.client.HttpClient;
 import org.mule.runtime.http.api.server.HttpServer;
 import org.mule.runtime.oauth.api.AuthorizationCodeOAuthDancer;
 import org.mule.runtime.oauth.api.ClientCredentialsOAuthDancer;
-import org.mule.runtime.oauth.api.OAuthService;
 import org.mule.runtime.oauth.api.builder.OAuthAuthorizationCodeDancerBuilder;
 import org.mule.runtime.oauth.api.builder.OAuthClientCredentialsDancerBuilder;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
-import org.mule.service.oauth.internal.DefaultOAuthService;
-import org.mule.tck.junit4.AbstractMuleContextTestCase;
+import org.mule.test.oauth.AbstractOAuthTestCase;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -40,33 +35,15 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
-import javax.inject.Inject;
-
 import io.qameta.allure.Feature;
 
 @Feature("OAuth Service")
-public class OAuthContextTestCase extends AbstractMuleContextTestCase {
+public class OAuthContextTestCase extends AbstractOAuthTestCase {
 
-  private OAuthService service;
   private Map<String, ResourceOwnerOAuthContext> tokensStore;
-
-  @Inject
-  private LockFactory lockFactory;
-
-  public OAuthContextTestCase() {
-    setStartContext(true);
-  }
-
-  @Override
-  protected boolean doTestClassInjection() {
-    return true;
-  }
 
   @Before
   public void before() throws ConnectionException, IOException, TimeoutException {
-    final HttpService httpService = mock(HttpService.class);
-    service = new DefaultOAuthService(httpService, mock(SchedulerService.class));
-
     tokensStore = new HashMap<>();
   }
 
@@ -171,7 +148,8 @@ public class OAuthContextTestCase extends AbstractMuleContextTestCase {
     assertThat(tokensStore, hasKey("user2"));
   }
 
-  private OAuthClientCredentialsDancerBuilder baseClientCredentialsDancerBuilder() throws Exception {
+  @Override
+  protected OAuthClientCredentialsDancerBuilder baseClientCredentialsDancerBuilder() {
     final OAuthClientCredentialsDancerBuilder builder =
         service.clientCredentialsGrantTypeDancerBuilder(lockFactory, tokensStore, mock(MuleExpressionLanguage.class));
 
@@ -180,7 +158,8 @@ public class OAuthContextTestCase extends AbstractMuleContextTestCase {
     return builder;
   }
 
-  private OAuthAuthorizationCodeDancerBuilder baseAuthCodeDancerbuilder() throws Exception {
+  @Override
+  protected OAuthAuthorizationCodeDancerBuilder baseAuthCodeDancerbuilder() {
     final OAuthAuthorizationCodeDancerBuilder builder =
         service.authorizationCodeGrantTypeDancerBuilder(lockFactory, tokensStore, mock(MuleExpressionLanguage.class));
 

@@ -26,8 +26,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.initialiseIfNeeded;
-import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.startIfNeeded;
 import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.stopIfNeeded;
 import static org.mule.runtime.http.api.HttpConstants.Method.GET;
 import static org.mule.service.oauth.internal.OAuthConstants.CODE_PARAMETER;
@@ -37,32 +35,22 @@ import static org.mule.service.oauth.internal.state.StateEncoder.RESOURCE_OWNER_
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.lifecycle.InitialisationException;
-import org.mule.runtime.api.lock.LockFactory;
-import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.runtime.api.util.MultiMap;
-import org.mule.runtime.http.api.HttpService;
-import org.mule.runtime.http.api.client.HttpClient;
-import org.mule.runtime.http.api.client.HttpClientFactory;
 import org.mule.runtime.http.api.domain.entity.InputStreamHttpEntity;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
 import org.mule.runtime.http.api.domain.message.response.HttpResponse;
 import org.mule.runtime.http.api.domain.request.HttpRequestContext;
-import org.mule.runtime.http.api.server.HttpServer;
-import org.mule.runtime.http.api.server.HttpServerFactory;
 import org.mule.runtime.http.api.server.RequestHandler;
 import org.mule.runtime.http.api.server.RequestHandlerManager;
 import org.mule.runtime.http.api.server.async.HttpResponseReadyCallback;
 import org.mule.runtime.oauth.api.AuthorizationCodeOAuthDancer;
 import org.mule.runtime.oauth.api.ClientCredentialsOAuthDancer;
-import org.mule.runtime.oauth.api.OAuthService;
 import org.mule.runtime.oauth.api.builder.AuthorizationCodeDanceCallbackContext;
 import org.mule.runtime.oauth.api.builder.OAuthAuthorizationCodeDancerBuilder;
 import org.mule.runtime.oauth.api.builder.OAuthClientCredentialsDancerBuilder;
-import org.mule.runtime.oauth.api.builder.OAuthDancerBuilder;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
 import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
-import org.mule.service.oauth.internal.DefaultOAuthService;
-import org.mule.tck.junit4.AbstractMuleContextTestCase;
+import org.mule.test.oauth.AbstractOAuthTestCase;
 
 import org.apache.commons.io.input.ReaderInputStream;
 import org.junit.Before;
@@ -80,57 +68,21 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
-import javax.inject.Inject;
-
 import io.qameta.allure.Feature;
 
 @Feature("OAuth Service")
-public class DancerConfigTestCase extends AbstractMuleContextTestCase {
-
-  private OAuthService service;
-  private HttpClient httpClient;
-  private HttpServer httpServer;
-
-  @Inject
-  private LockFactory lockFactory;
+public class DancerConfigTestCase extends AbstractOAuthTestCase {
 
   @Rule
   public ExpectedException expected = none();
-
-  public DancerConfigTestCase() {
-    setStartContext(true);
-  }
-
-  @Override
-  protected boolean doTestClassInjection() {
-    return true;
-  }
 
   private ArgumentCaptor<RequestHandler> requestHandlerCaptor = forClass(RequestHandler.class);
 
   @Before
   public void before() throws Exception {
-    final HttpService httpService = mock(HttpService.class);
-    final HttpClientFactory httpClientFactory = mock(HttpClientFactory.class);
-    httpClient = mock(HttpClient.class);
-    when(httpClientFactory.create(any())).thenReturn(httpClient);
-    when(httpService.getClientFactory()).thenReturn(httpClientFactory);
-
-    final HttpServerFactory httpServerFactory = mock(HttpServerFactory.class);
-    httpServer = mock(HttpServer.class);
     when(httpServer.addRequestHandler(anyString(), requestHandlerCaptor.capture())).thenReturn(mock(RequestHandlerManager.class));
     when(httpServer.addRequestHandler(any(), anyString(), requestHandlerCaptor.capture()))
         .thenReturn(mock(RequestHandlerManager.class));
-    when(httpServerFactory.create(any())).thenReturn(httpServer);
-    when(httpService.getServerFactory()).thenReturn(httpServerFactory);
-
-    service = new DefaultOAuthService(httpService, mock(SchedulerService.class));
-
-    final HttpResponse httpResponse = mock(HttpResponse.class);
-    final InputStreamHttpEntity httpEntity = mock(InputStreamHttpEntity.class);
-    when(httpEntity.getContent()).thenReturn(new ReaderInputStream(new StringReader("")));
-    when(httpResponse.getEntity()).thenReturn(httpEntity);
-    when(httpClient.send(any(), any())).thenReturn(httpResponse);
   }
 
   @Test
@@ -444,31 +396,6 @@ public class DancerConfigTestCase extends AbstractMuleContextTestCase {
 
     assertThat(dancer1.getContextForResourceOwner("owner"), sameInstance(contextOwnerConn1));
     assertThat(dancer2.getContextForResourceOwner("owner"), sameInstance(contextOwnerConn2));
-  }
-
-  private OAuthClientCredentialsDancerBuilder baseClientCredentialsDancerBuilder() {
-    final OAuthClientCredentialsDancerBuilder builder =
-        service.clientCredentialsGrantTypeDancerBuilder(lockFactory, new HashMap<>(), mock(MuleExpressionLanguage.class));
-
-    builder.clientCredentials("clientId", "clientSecret");
-    return builder;
-  }
-
-  private OAuthAuthorizationCodeDancerBuilder baseAuthCodeDancerbuilder() {
-    final OAuthAuthorizationCodeDancerBuilder builder =
-        service.authorizationCodeGrantTypeDancerBuilder(lockFactory, new HashMap<>(), mock(MuleExpressionLanguage.class));
-
-    builder.clientCredentials("clientId", "clientSecret");
-    return builder;
-  }
-
-  private <D> D startDancer(final OAuthDancerBuilder<D> builder)
-      throws InitialisationException, MuleException {
-    final D dancer = builder.build();
-    initialiseIfNeeded(dancer);
-    startIfNeeded(dancer);
-
-    return dancer;
   }
 
   private void configureRequestHandler(String resourceOwner, String state) {
