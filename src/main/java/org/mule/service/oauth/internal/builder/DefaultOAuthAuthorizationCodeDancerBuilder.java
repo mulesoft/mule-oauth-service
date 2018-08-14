@@ -60,6 +60,7 @@ public class DefaultOAuthAuthorizationCodeDancerBuilder extends AbstractOAuthDan
                                                     Map<String, DefaultResourceOwnerOAuthContext> tokensStore,
                                                     HttpService httpService, MuleExpressionLanguage expressionEvaluator) {
     super(lockProvider, tokensStore, httpService, expressionEvaluator);
+    encodeClientCredentialsInBody = true;
   }
 
   @Override
