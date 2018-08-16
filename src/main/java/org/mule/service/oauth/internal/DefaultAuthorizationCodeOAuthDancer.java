@@ -8,12 +8,12 @@ package org.mule.service.oauth.internal;
 
 import static java.lang.String.format;
 import static java.lang.String.valueOf;
-import static java.lang.Thread.currentThread;
 import static java.util.Collections.singleton;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
 import static org.mule.runtime.api.metadata.MediaType.ANY;
 import static org.mule.runtime.api.metadata.MediaType.parse;
+import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.runtime.core.api.util.StringUtils.isBlank;
 import static org.mule.runtime.http.api.HttpConstants.HttpStatus.BAD_REQUEST;
 import static org.mule.runtime.http.api.HttpConstants.HttpStatus.INTERNAL_SERVER_ERROR;
@@ -160,19 +160,15 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
 
   private static RequestHandlerManager addRequestHandler(HttpServer server, Method method, String path,
                                                          RequestHandler callbackHandler) {
-    // MULE-11277 Support non-blocking in OAuth http listeners
     return server.addRequestHandler(singleton(method.name()), path, (requestContext, responseCallback) -> {
-      final ClassLoader previousCtxClassLoader = currentThread().getContextClassLoader();
-      try {
-        currentThread().setContextClassLoader(DefaultAuthorizationCodeOAuthDancer.class.getClassLoader());
-
-        callbackHandler.handleRequest(requestContext, responseCallback);
-      } catch (Exception e) {
-        LOGGER.error("Uncaught Exception on OAuth listener", e);
-        sendErrorResponse(INTERNAL_SERVER_ERROR, e.getMessage(), responseCallback);
-      } finally {
-        currentThread().setContextClassLoader(previousCtxClassLoader);
-      }
+      withContextClassLoader(DefaultAuthorizationCodeOAuthDancer.class.getClassLoader(), () -> {
+        try {
+          callbackHandler.handleRequest(requestContext, responseCallback);
+        } catch (Exception e) {
+          LOGGER.error("Uncaught Exception on OAuth listener", e);
+          sendErrorResponse(INTERNAL_SERVER_ERROR, e.getMessage(), responseCallback);
+        }
+      });
     });
   }
 
@@ -237,44 +233,52 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
 
       invokeTokenUrl(tokenUrl, formData, authorization, true, encoding)
           .exceptionally(e -> {
-            LOGGER.error(e.getMessage());
-            if (e.getCause() instanceof TokenUrlResponseException) {
-              sendResponse(stateDecoder, responseCallback, INTERNAL_SERVER_ERROR,
-                           format("Failure calling token url %s. Exception message is %s", tokenUrl, e.getMessage()),
-                           TOKEN_URL_CALL_FAILED_STATUS);
+            withContextClassLoader(DefaultAuthorizationCodeOAuthDancer.class.getClassLoader(), () -> {
+              if (e.getCause() instanceof TokenUrlResponseException) {
+                LOGGER.error(e.getMessage());
+                sendResponse(stateDecoder, responseCallback, INTERNAL_SERVER_ERROR,
+                             format("Failure calling token url %s. Exception message is %s", tokenUrl, e.getMessage()),
+                             TOKEN_URL_CALL_FAILED_STATUS);
 
-            } else if (e.getCause() instanceof TokenNotFoundException) {
-              sendResponse(stateDecoder, responseCallback, INTERNAL_SERVER_ERROR,
-                           "Failed getting access token or refresh token from token URL response. See logs for details.",
-                           TOKEN_NOT_FOUND_STATUS);
+              } else if (e.getCause() instanceof TokenNotFoundException) {
+                LOGGER.error(e.getMessage());
+                sendResponse(stateDecoder, responseCallback, INTERNAL_SERVER_ERROR,
+                             "Failed getting access token or refresh token from token URL response. See logs for details.",
+                             TOKEN_NOT_FOUND_STATUS);
 
-            } else {
-              LOGGER.error(e.getMessage(), e);
-            }
+              } else {
+                LOGGER.error("Uncaught Exception on OAuth listener", e);
+                sendErrorResponse(INTERNAL_SERVER_ERROR, e.getMessage(), responseCallback);
+              }
+            });
             return null;
           }).thenAccept(tokenResponse -> {
-            if (tokenResponse == null) {
-              return;
-            }
+            withContextClassLoader(DefaultAuthorizationCodeOAuthDancer.class.getClassLoader(), () -> {
+              if (tokenResponse == null) {
+                // This is just for the case where an error was already handled
+                return;
+              }
 
-            final DefaultResourceOwnerOAuthContext resourceOwnerOAuthContext =
-                (DefaultResourceOwnerOAuthContext) getContextForResourceOwner(resourceOwnerId == null ? DEFAULT_RESOURCE_OWNER_ID
-                    : resourceOwnerId);
+              final DefaultResourceOwnerOAuthContext resourceOwnerOAuthContext =
+                  (DefaultResourceOwnerOAuthContext) getContextForResourceOwner(resourceOwnerId == null
+                      ? DEFAULT_RESOURCE_OWNER_ID
+                      : resourceOwnerId);
 
-            if (LOGGER.isDebugEnabled()) {
-              LOGGER.debug("Update OAuth Context for resourceOwnerId %s", resourceOwnerOAuthContext.getResourceOwnerId());
-              LOGGER.debug("Retrieved access token, refresh token and expires from token url are: %s, %s, %s",
-                           tokenResponse.getAccessToken(), tokenResponse.getRefreshToken(),
-                           tokenResponse.getExpiresIn());
-            }
+              if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("Update OAuth Context for resourceOwnerId %s", resourceOwnerOAuthContext.getResourceOwnerId());
+                LOGGER.debug("Retrieved access token, refresh token and expires from token url are: %s, %s, %s",
+                             tokenResponse.getAccessToken(), tokenResponse.getRefreshToken(),
+                             tokenResponse.getExpiresIn());
+              }
 
-            updateResourceOwnerState(resourceOwnerOAuthContext, stateDecoder.decodeOriginalState(), tokenResponse);
-            updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
+              updateResourceOwnerState(resourceOwnerOAuthContext, stateDecoder.decodeOriginalState(), tokenResponse);
+              updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
 
-            afterDanceCallback.accept(beforeCallbackContext, resourceOwnerOAuthContext);
+              afterDanceCallback.accept(beforeCallbackContext, resourceOwnerOAuthContext);
 
-            sendResponse(stateDecoder, responseCallback, OK, "Successfully retrieved access token",
-                         AUTHORIZATION_CODE_RECEIVED_STATUS);
+              sendResponse(stateDecoder, responseCallback, OK, "Successfully retrieved access token",
+                           AUTHORIZATION_CODE_RECEIVED_STATUS);
+            });
           });
     };
   }
@@ -459,11 +463,13 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
         formData.put(REDIRECT_URI_PARAMETER, externalCallbackUrl);
 
         return invokeTokenUrl(tokenUrl, formData, authorization, true, encoding).thenAccept(tokenResponse -> {
-          if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("Update OAuth Context for resourceOwnerId %s", resourceOwnerOAuthContext.getResourceOwnerId());
-          }
-          updateResourceOwnerState(resourceOwnerOAuthContext, null, tokenResponse);
-          updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
+          withContextClassLoader(DefaultAuthorizationCodeOAuthDancer.class.getClassLoader(), () -> {
+            if (LOGGER.isDebugEnabled()) {
+              LOGGER.debug("Update OAuth Context for resourceOwnerId %s", resourceOwnerOAuthContext.getResourceOwnerId());
+            }
+            updateResourceOwnerState(resourceOwnerOAuthContext, null, tokenResponse);
+            updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
+          });
         });
       }
     } finally {

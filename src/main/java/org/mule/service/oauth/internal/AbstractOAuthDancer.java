@@ -13,6 +13,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.mule.runtime.api.metadata.DataType.STRING;
 import static org.mule.runtime.api.metadata.MediaType.ANY;
 import static org.mule.runtime.api.metadata.MediaType.parse;
+import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.runtime.http.api.HttpConstants.HttpStatus.BAD_REQUEST;
 import static org.mule.runtime.http.api.HttpConstants.Method.POST;
 import static org.mule.runtime.http.api.HttpHeaders.Names.AUTHORIZATION;
@@ -138,9 +139,6 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   protected CompletableFuture<TokenResponse> invokeTokenUrl(String tokenUrl, Map<String, String> tokenRequestFormToSend,
                                                             String authorization,
                                                             boolean retrieveRefreshToken, Charset encoding) {
-    // final CompletableFuture<TokenResponse> result = new CompletableFuture<>();
-
-    // try {
     final HttpRequestBuilder requestBuilder = HttpRequest.builder()
         .uri(tokenUrl).method(POST.name())
         .entity(new ByteArrayHttpEntity(encodeString(tokenRequestFormToSend, encoding).getBytes()))
@@ -150,116 +148,59 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
       requestBuilder.addHeader(AUTHORIZATION, authorization);
     }
 
-    // TODO MULE-11272 Support doing non-blocking requests
-    // HttpResponse response;
-    //
-    // response =
     return httpClient.sendAsync(requestBuilder.build(), HttpRequestOptions.builder()
         .responseTimeout(TOKEN_REQUEST_TIMEOUT_MILLIS)
         .build())
         .exceptionally(t -> {
-          t.printStackTrace();
-          if (t instanceof IOException) {
-            throw new CompletionException(new TokenUrlResponseException(tokenUrl, (IOException) t));
-          } else {
-            throw new CompletionException(t);
-          }
+          return withContextClassLoader(AbstractOAuthDancer.class.getClassLoader(), () -> {
+            if (t instanceof IOException) {
+              throw new CompletionException(new TokenUrlResponseException(tokenUrl, (IOException) t));
+            } else {
+              throw new CompletionException(t);
+            }
+          });
         })
         .thenApply(response -> {
-          String contentType = response.getHeaderValue(CONTENT_TYPE);
-          MediaType responseContentType = contentType != null ? parse(contentType) : ANY;
+          return withContextClassLoader(AbstractOAuthDancer.class.getClassLoader(), () -> {
+            String contentType = response.getHeaderValue(CONTENT_TYPE);
+            MediaType responseContentType = contentType != null ? parse(contentType) : ANY;
 
-          String body = IOUtils.toString(response.getEntity().getContent());
+            String body = IOUtils.toString(response.getEntity().getContent());
 
-          if (response.getStatusCode() >= BAD_REQUEST.getStatusCode()) {
-            try {
-              throw new CompletionException(new TokenUrlResponseException(tokenUrl, response, body));
-            } catch (IOException e) {
-              throw new CompletionException(new TokenUrlResponseException(tokenUrl, e));
+            if (response.getStatusCode() >= BAD_REQUEST.getStatusCode()) {
+              try {
+                throw new CompletionException(new TokenUrlResponseException(tokenUrl, response, body));
+              } catch (IOException e) {
+                throw new CompletionException(new TokenUrlResponseException(tokenUrl, e));
+              }
             }
-          }
 
-          MultiMap<String, String> headers = response.getHeaders();
+            MultiMap<String, String> headers = response.getHeaders();
 
-          TokenResponse tokenResponse = new TokenResponse();
-          tokenResponse
-              .setAccessToken(resolveExpression(responseAccessTokenExpr, body, headers, responseContentType));
-          if (tokenResponse.getAccessToken() == null) {
-            throw new CompletionException(new TokenNotFoundException(tokenUrl, response, body));
-          }
-          if (retrieveRefreshToken) {
+            TokenResponse tokenResponse = new TokenResponse();
             tokenResponse
-                .setRefreshToken(resolveExpression(responseRefreshTokenExpr, body, headers, responseContentType));
-          }
-          tokenResponse.setExpiresIn(resolveExpression(responseExpiresInExpr, body, headers, responseContentType));
-
-          if (customParametersExtractorsExprs != null && !customParametersExtractorsExprs.isEmpty()) {
-            Map<String, Object> customParams = new HashMap<>();
-            for (Entry<String, String> customParamExpr : customParametersExtractorsExprs.entrySet()) {
-              customParams.put(customParamExpr.getKey(),
-                               resolveExpression(customParamExpr.getValue(), body, headers, responseContentType));
+                .setAccessToken(resolveExpression(responseAccessTokenExpr, body, headers, responseContentType));
+            if (tokenResponse.getAccessToken() == null) {
+              throw new CompletionException(new TokenNotFoundException(tokenUrl, response, body));
             }
-            tokenResponse.setCustomResponseParameters(customParams);
-          }
+            if (retrieveRefreshToken) {
+              tokenResponse
+                  .setRefreshToken(resolveExpression(responseRefreshTokenExpr, body, headers, responseContentType));
+            }
+            tokenResponse.setExpiresIn(resolveExpression(responseExpiresInExpr, body, headers, responseContentType));
 
-          return tokenResponse;
+            if (customParametersExtractorsExprs != null && !customParametersExtractorsExprs.isEmpty()) {
+              Map<String, Object> customParams = new HashMap<>();
+              for (Entry<String, String> customParamExpr : customParametersExtractorsExprs.entrySet()) {
+                customParams.put(customParamExpr.getKey(),
+                                 resolveExpression(customParamExpr.getValue(), body, headers, responseContentType));
+              }
+              tokenResponse.setCustomResponseParameters(customParams);
+            }
+
+            return tokenResponse;
+          });
         });
-
-    //
-    //
-    // try {
-    // response = httpClient.sendAsync(requestBuilder.build(), HttpRequestOptions.builder()
-    // .responseTimeout(TOKEN_REQUEST_TIMEOUT_MILLIS)
-    // .build()).get();
-    // } catch (InterruptedException e) {
-    // currentThread().interrupt();
-    // result.completeExceptionally(new TokenUrlResponseException(tokenUrl, e));
-    // return result;
-    // } catch (ExecutionException e) {
-    // result.completeExceptionally(new TokenUrlResponseException(tokenUrl, (Exception) e.getCause()));
-    // return result;
-    // }
-    //
-    // String contentType = response.getHeaderValue(CONTENT_TYPE);
-    // MediaType responseContentType = contentType != null ? parse(contentType) : ANY;
-    //
-    // String body = IOUtils.toString(response.getEntity().getContent());
-    //
-    // if (response.getStatusCode() >= BAD_REQUEST.getStatusCode()) {
-    // result.completeExceptionally(new TokenUrlResponseException(tokenUrl, response, body));
-    // return result;
-    // }
-    //
-    // MultiMap<String, String> headers = response.getHeaders();
-    //
-    // TokenResponse tokenResponse = new TokenResponse();
-    // tokenResponse
-    // .setAccessToken(resolveExpression(responseAccessTokenExpr, body, headers, responseContentType));
-    // if (tokenResponse.getAccessToken() == null) {
-    // result.completeExceptionally(new TokenNotFoundException(tokenUrl, response, body));
-    // return result;
-    // }
-    // if (retrieveRefreshToken) {
-    // tokenResponse
-    // .setRefreshToken(resolveExpression(responseRefreshTokenExpr, body, headers, responseContentType));
-    // }
-    // tokenResponse.setExpiresIn(resolveExpression(responseExpiresInExpr, body, headers, responseContentType));
-    //
-    // if (customParametersExtractorsExprs != null && !customParametersExtractorsExprs.isEmpty()) {
-    // Map<String, Object> customParams = new HashMap<>();
-    // for (Entry<String, String> customParamExpr : customParametersExtractorsExprs.entrySet()) {
-    // customParams.put(customParamExpr.getKey(),
-    // resolveExpression(customParamExpr.getValue(), body, headers, responseContentType));
-    // }
-    // tokenResponse.setCustomResponseParameters(customParams);
-    // }
-    //
-    // result.complete(tokenResponse);
-    // return result;
-    // } catch (IOException e) {
-    // result.completeExceptionally(new TokenUrlResponseException(tokenUrl, e));
-    // return result;
-    // }
   }
 
   protected <T> T resolveExpression(String expr, Object body, MultiMap<String, String> headers,

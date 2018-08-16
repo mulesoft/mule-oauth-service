@@ -105,7 +105,6 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
     builder.tokenUrl("http://host/token");
 
     reset(httpClient);
-    when(httpClient.send(any(), any())).thenThrow(new IOException("It failed!"));
     final CompletableFuture<HttpResponse> failedFuture = new CompletableFuture<>();
     failedFuture.completeExceptionally(new IOException("It failed!"));
     when(httpClient.sendAsync(any(), any())).thenReturn(failedFuture);
@@ -127,7 +126,6 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
     when(httpEntity.getContent()).thenReturn(new ReaderInputStream(new StringReader("")));
     when(httpResponse.getEntity()).thenReturn(httpEntity);
     when(httpResponse.getStatusCode()).thenReturn(403);
-    when(httpClient.send(any(), any())).thenReturn(httpResponse);
     when(httpClient.sendAsync(any(), any())).thenReturn(completedFuture(httpResponse));
 
     ClientCredentialsOAuthDancer minimalDancer = startDancer(builder);

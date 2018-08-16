@@ -37,7 +37,6 @@ import org.junit.Before;
 
 import java.io.StringReader;
 import java.util.HashMap;
-import java.util.concurrent.CompletableFuture;
 
 import javax.inject.Inject;
 
@@ -78,7 +77,6 @@ public abstract class AbstractOAuthTestCase extends AbstractMuleContextTestCase 
     final InputStreamHttpEntity httpEntity = mock(InputStreamHttpEntity.class);
     when(httpEntity.getContent()).thenReturn(new ReaderInputStream(new StringReader("")));
     when(httpResponse.getEntity()).thenReturn(httpEntity);
-    when(httpClient.send(any(), any())).thenReturn(httpResponse);
     when(httpClient.sendAsync(any(), any())).thenReturn(completedFuture(httpResponse));
   }
 
