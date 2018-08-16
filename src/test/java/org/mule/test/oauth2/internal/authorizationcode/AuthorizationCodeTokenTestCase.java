@@ -74,7 +74,7 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
     localCallbackCaptor.getValue().handleRequest(buildLocalCallbackRequestContext(), mock(HttpResponseReadyCallback.class));
 
     ArgumentCaptor<HttpRequest> requestCaptor = forClass(HttpRequest.class);
-    verify(httpClient).send(requestCaptor.capture(), any(HttpRequestOptions.class));
+    verify(httpClient).sendAsync(requestCaptor.capture(), any(HttpRequestOptions.class));
 
     assertThat(requestCaptor.getValue().getHeaderValue(AUTHORIZATION), is("Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=="));
 
@@ -98,7 +98,7 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
     localCallbackCaptor.getValue().handleRequest(buildLocalCallbackRequestContext(), mock(HttpResponseReadyCallback.class));
 
     ArgumentCaptor<HttpRequest> requestCaptor = forClass(HttpRequest.class);
-    verify(httpClient).send(requestCaptor.capture(), any(HttpRequestOptions.class));
+    verify(httpClient).sendAsync(requestCaptor.capture(), any(HttpRequestOptions.class));
 
     assertThat(requestCaptor.getValue().getHeaderNames(), not(hasItem(equalToIgnoringCase(AUTHORIZATION))));
 
@@ -132,7 +132,7 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
     minimalDancer.refreshToken(null);
 
     ArgumentCaptor<HttpRequest> requestCaptor = forClass(HttpRequest.class);
-    verify(httpClient).send(requestCaptor.capture(), any(HttpRequestOptions.class));
+    verify(httpClient).sendAsync(requestCaptor.capture(), any(HttpRequestOptions.class));
 
     assertThat(requestCaptor.getValue().getHeaderValue(AUTHORIZATION), is("Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=="));
 
@@ -153,7 +153,7 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
     minimalDancer.refreshToken(null);
 
     ArgumentCaptor<HttpRequest> requestCaptor = forClass(HttpRequest.class);
-    verify(httpClient).send(requestCaptor.capture(), any(HttpRequestOptions.class));
+    verify(httpClient).sendAsync(requestCaptor.capture(), any(HttpRequestOptions.class));
 
     assertThat(requestCaptor.getValue().getHeaderNames(), not(hasItem(equalToIgnoringCase(AUTHORIZATION))));
 

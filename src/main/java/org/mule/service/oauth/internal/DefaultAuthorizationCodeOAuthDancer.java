@@ -235,42 +235,45 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
       formData.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_AUTHENTICATION_CODE);
       formData.put(REDIRECT_URI_PARAMETER, externalCallbackUrl);
 
-      try {
-        TokenResponse tokenResponse = invokeTokenUrl(tokenUrl, formData, authorization, true, encoding);
+      invokeTokenUrl(tokenUrl, formData, authorization, true, encoding)
+          .exceptionally(e -> {
+            LOGGER.error(e.getMessage());
+            if (e instanceof TokenUrlResponseException) {
+              sendResponse(stateDecoder, responseCallback, INTERNAL_SERVER_ERROR,
+                           format("Failure calling token url %s. Exception message is %s", tokenUrl, e.getMessage()),
+                           TOKEN_URL_CALL_FAILED_STATUS);
 
-        final DefaultResourceOwnerOAuthContext resourceOwnerOAuthContext =
-            (DefaultResourceOwnerOAuthContext) getContextForResourceOwner(resourceOwnerId == null ? DEFAULT_RESOURCE_OWNER_ID
-                : resourceOwnerId);
+            } else if (e instanceof TokenNotFoundException) {
+              sendResponse(stateDecoder, responseCallback, INTERNAL_SERVER_ERROR,
+                           "Failed getting access token or refresh token from token URL response. See logs for details.",
+                           TOKEN_NOT_FOUND_STATUS);
 
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("Update OAuth Context for resourceOwnerId %s", resourceOwnerOAuthContext.getResourceOwnerId());
-          LOGGER.debug("Retrieved access token, refresh token and expires from token url are: %s, %s, %s",
-                       tokenResponse.getAccessToken(), tokenResponse.getRefreshToken(),
-                       tokenResponse.getExpiresIn());
-        }
+            }
+            return null;
+          }).thenAccept(tokenResponse -> {
+            if (tokenResponse == null) {
+              return;
+            }
 
-        updateResourceOwnerState(resourceOwnerOAuthContext, stateDecoder.decodeOriginalState(), tokenResponse);
-        updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
+            final DefaultResourceOwnerOAuthContext resourceOwnerOAuthContext =
+                (DefaultResourceOwnerOAuthContext) getContextForResourceOwner(resourceOwnerId == null ? DEFAULT_RESOURCE_OWNER_ID
+                    : resourceOwnerId);
 
-        afterDanceCallback.accept(beforeCallbackContext, resourceOwnerOAuthContext);
+            if (LOGGER.isDebugEnabled()) {
+              LOGGER.debug("Update OAuth Context for resourceOwnerId %s", resourceOwnerOAuthContext.getResourceOwnerId());
+              LOGGER.debug("Retrieved access token, refresh token and expires from token url are: %s, %s, %s",
+                           tokenResponse.getAccessToken(), tokenResponse.getRefreshToken(),
+                           tokenResponse.getExpiresIn());
+            }
 
-        sendResponse(stateDecoder, responseCallback, OK, "Successfully retrieved access token",
-                     AUTHORIZATION_CODE_RECEIVED_STATUS);
-      } catch (TokenUrlResponseException e) {
-        LOGGER.error(e.getMessage());
+            updateResourceOwnerState(resourceOwnerOAuthContext, stateDecoder.decodeOriginalState(), tokenResponse);
+            updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
 
-        sendResponse(stateDecoder, responseCallback, INTERNAL_SERVER_ERROR,
-                     format("Failure calling token url %s. Exception message is %s", tokenUrl, e.getMessage()),
-                     TOKEN_URL_CALL_FAILED_STATUS);
-        return;
-      } catch (TokenNotFoundException e) {
-        LOGGER.error(e.getMessage());
+            afterDanceCallback.accept(beforeCallbackContext, resourceOwnerOAuthContext);
 
-        sendResponse(stateDecoder, responseCallback, INTERNAL_SERVER_ERROR,
-                     "Failed getting access token or refresh token from token URL response. See logs for details.",
-                     TOKEN_NOT_FOUND_STATUS);
-        return;
-      }
+            sendResponse(stateDecoder, responseCallback, OK, "Successfully retrieved access token",
+                         AUTHORIZATION_CODE_RECEIVED_STATUS);
+          });
     };
   }
 
@@ -453,18 +456,13 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
         formData.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_REFRESH_TOKEN);
         formData.put(REDIRECT_URI_PARAMETER, externalCallbackUrl);
 
-        try {
-          TokenResponse tokenResponse = invokeTokenUrl(tokenUrl, formData, authorization, true, encoding);
+        return invokeTokenUrl(tokenUrl, formData, authorization, true, encoding).thenAccept(tokenResponse -> {
           if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Update OAuth Context for resourceOwnerId %s", resourceOwnerOAuthContext.getResourceOwnerId());
           }
           updateResourceOwnerState(resourceOwnerOAuthContext, null, tokenResponse);
           updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
-        } catch (TokenUrlResponseException | TokenNotFoundException e) {
-          final CompletableFuture<Void> exceptionFuture = new CompletableFuture<>();
-          exceptionFuture.completeExceptionally(e);
-          return exceptionFuture;
-        }
+        });
       }
     } finally {
       if (lockWasAcquired) {

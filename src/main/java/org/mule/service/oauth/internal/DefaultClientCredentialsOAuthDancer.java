@@ -28,9 +28,6 @@ import org.mule.runtime.oauth.api.exception.TokenNotFoundException;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
 import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
-import org.mule.service.oauth.internal.state.TokenResponse;
-
-import org.slf4j.Logger;
 
 import java.nio.charset.Charset;
 import java.util.HashMap;
@@ -39,6 +36,8 @@ import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
+
+import org.slf4j.Logger;
 
 /**
  * Provides OAuth dance support for client-credentials grant-type.
@@ -121,9 +120,7 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
     }
     String authorization = handleClientCredentials(formData, encodeClientCredentialsInBody);
 
-    try {
-      TokenResponse tokenResponse = invokeTokenUrl(tokenUrl, formData, authorization, false, encoding);
-
+    return invokeTokenUrl(tokenUrl, formData, authorization, false, encoding).thenAccept(tokenResponse -> {
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Retrieved access token, refresh token and expires from token url are: %s, %s, %s",
                      tokenResponse.getAccessToken(), tokenResponse.getRefreshToken(), tokenResponse.getExpiresIn());
@@ -138,12 +135,7 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
       }
 
       updateResourceOwnerOAuthContext(defaultUserState);
-      return completedFuture(null);
-    } catch (TokenUrlResponseException | TokenNotFoundException e) {
-      final CompletableFuture<Void> exceptionFuture = new CompletableFuture<>();
-      exceptionFuture.completeExceptionally(e);
-      return exceptionFuture;
-    }
+    });
   }
 
   @Override

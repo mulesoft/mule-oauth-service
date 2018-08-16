@@ -40,7 +40,7 @@ public class ClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
     ClientCredentialsOAuthDancer minimalDancer = startDancer(builder);
 
     ArgumentCaptor<HttpRequest> requestCaptor = forClass(HttpRequest.class);
-    verify(httpClient).send(requestCaptor.capture(), any(HttpRequestOptions.class));
+    verify(httpClient).sendAsync(requestCaptor.capture(), any(HttpRequestOptions.class));
 
     assertThat(requestCaptor.getValue().getHeaderValue(AUTHORIZATION), is("Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=="));
 
@@ -60,7 +60,7 @@ public class ClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
     ClientCredentialsOAuthDancer minimalDancer = startDancer(builder);
 
     ArgumentCaptor<HttpRequest> requestCaptor = forClass(HttpRequest.class);
-    verify(httpClient).send(requestCaptor.capture(), any(HttpRequestOptions.class));
+    verify(httpClient).sendAsync(requestCaptor.capture(), any(HttpRequestOptions.class));
 
     assertThat(requestCaptor.getValue().getHeaderNames(), not(hasItem(equalToIgnoringCase(AUTHORIZATION))));
 

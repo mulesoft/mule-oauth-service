@@ -7,7 +7,9 @@
 package org.mule.service.oauth.internal;
 
 import static java.lang.String.format;
+import static java.lang.Thread.currentThread;
 import static java.util.Collections.singletonMap;
+import static java.util.concurrent.CompletableFuture.completedFuture;
 import static org.apache.commons.codec.binary.Base64.encodeBase64String;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.mule.runtime.api.metadata.DataType.STRING;
@@ -50,6 +52,8 @@ import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
@@ -134,9 +138,11 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     }
   }
 
-  protected TokenResponse invokeTokenUrl(String tokenUrl, Map<String, String> tokenRequestFormToSend, String authorization,
-                                         boolean retrieveRefreshToken, Charset encoding)
-      throws TokenUrlResponseException, TokenNotFoundException {
+  protected CompletableFuture<TokenResponse> invokeTokenUrl(String tokenUrl, Map<String, String> tokenRequestFormToSend,
+                                                            String authorization,
+                                                            boolean retrieveRefreshToken, Charset encoding) {
+    final CompletableFuture<TokenResponse> result = new CompletableFuture<>();
+
     try {
       final HttpRequestBuilder requestBuilder = HttpRequest.builder()
           .uri(tokenUrl).method(POST.name())
@@ -148,9 +154,19 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
       }
 
       // TODO MULE-11272 Support doing non-blocking requests
-      final HttpResponse response = httpClient.send(requestBuilder.build(), HttpRequestOptions.builder()
-          .responseTimeout(TOKEN_REQUEST_TIMEOUT_MILLIS)
-          .build());
+      HttpResponse response;
+      try {
+        response = httpClient.sendAsync(requestBuilder.build(), HttpRequestOptions.builder()
+            .responseTimeout(TOKEN_REQUEST_TIMEOUT_MILLIS)
+            .build()).get();
+      } catch (InterruptedException e) {
+        currentThread().interrupt();
+        result.completeExceptionally(new TokenUrlResponseException(tokenUrl, e));
+        return result;
+      } catch (ExecutionException e) {
+        result.completeExceptionally(new TokenUrlResponseException(tokenUrl, (Exception) e.getCause()));
+        return result;
+      }
 
       String contentType = response.getHeaderValue(CONTENT_TYPE);
       MediaType responseContentType = contentType != null ? parse(contentType) : ANY;
@@ -158,7 +174,8 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
       String body = IOUtils.toString(response.getEntity().getContent());
 
       if (response.getStatusCode() >= BAD_REQUEST.getStatusCode()) {
-        throw new TokenUrlResponseException(tokenUrl, response, body);
+        result.completeExceptionally(new TokenUrlResponseException(tokenUrl, response, body));
+        return result;
       }
 
       MultiMap<String, String> headers = response.getHeaders();
@@ -167,7 +184,8 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
       tokenResponse
           .setAccessToken(resolveExpression(responseAccessTokenExpr, body, headers, responseContentType));
       if (tokenResponse.getAccessToken() == null) {
-        throw new TokenNotFoundException(tokenUrl, response, body);
+        result.completeExceptionally(new TokenNotFoundException(tokenUrl, response, body));
+        return result;
       }
       if (retrieveRefreshToken) {
         tokenResponse
@@ -184,11 +202,11 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
         tokenResponse.setCustomResponseParameters(customParams);
       }
 
-      return tokenResponse;
+      result.complete(tokenResponse);
+      return result;
     } catch (IOException e) {
-      throw new TokenUrlResponseException(tokenUrl, e);
-    } catch (TimeoutException e) {
-      throw new TokenUrlResponseException(tokenUrl, e);
+      result.completeExceptionally(new TokenUrlResponseException(tokenUrl, e));
+      return result;
     }
   }
 
