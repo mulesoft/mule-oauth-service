@@ -7,9 +7,7 @@
 package org.mule.service.oauth.internal;
 
 import static java.lang.String.format;
-import static java.lang.Thread.currentThread;
 import static java.util.Collections.singletonMap;
-import static java.util.concurrent.CompletableFuture.completedFuture;
 import static org.apache.commons.codec.binary.Base64.encodeBase64String;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.mule.runtime.api.metadata.DataType.STRING;
@@ -24,6 +22,7 @@ import static org.mule.runtime.http.api.utils.HttpEncoderDecoderUtils.encodeStri
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
 import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_ID_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_SECRET_PARAMETER;
+
 import org.mule.runtime.api.el.BindingContext;
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.MuleException;
@@ -40,7 +39,6 @@ import org.mule.runtime.http.api.client.HttpRequestOptions;
 import org.mule.runtime.http.api.domain.entity.ByteArrayHttpEntity;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
 import org.mule.runtime.http.api.domain.message.request.HttpRequestBuilder;
-import org.mule.runtime.http.api.domain.message.response.HttpResponse;
 import org.mule.runtime.oauth.api.exception.TokenNotFoundException;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
 import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
@@ -53,8 +51,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 
@@ -123,7 +120,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   /**
    * Based on the value of {@code encodeClientCredentialsInBody}, add the clientId and clientSecret values to the form or encode
    * and return them.
-   * 
+   *
    * @param formData
    * @param encodeClientCredentialsInBody
    * @return
@@ -141,73 +138,128 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   protected CompletableFuture<TokenResponse> invokeTokenUrl(String tokenUrl, Map<String, String> tokenRequestFormToSend,
                                                             String authorization,
                                                             boolean retrieveRefreshToken, Charset encoding) {
-    final CompletableFuture<TokenResponse> result = new CompletableFuture<>();
+    // final CompletableFuture<TokenResponse> result = new CompletableFuture<>();
 
-    try {
-      final HttpRequestBuilder requestBuilder = HttpRequest.builder()
-          .uri(tokenUrl).method(POST.name())
-          .entity(new ByteArrayHttpEntity(encodeString(tokenRequestFormToSend, encoding).getBytes()))
-          .addHeader(CONTENT_TYPE, APPLICATION_X_WWW_FORM_URLENCODED.toRfcString());
+    // try {
+    final HttpRequestBuilder requestBuilder = HttpRequest.builder()
+        .uri(tokenUrl).method(POST.name())
+        .entity(new ByteArrayHttpEntity(encodeString(tokenRequestFormToSend, encoding).getBytes()))
+        .addHeader(CONTENT_TYPE, APPLICATION_X_WWW_FORM_URLENCODED.toRfcString());
 
-      if (authorization != null) {
-        requestBuilder.addHeader(AUTHORIZATION, authorization);
-      }
-
-      // TODO MULE-11272 Support doing non-blocking requests
-      HttpResponse response;
-      try {
-        response = httpClient.sendAsync(requestBuilder.build(), HttpRequestOptions.builder()
-            .responseTimeout(TOKEN_REQUEST_TIMEOUT_MILLIS)
-            .build()).get();
-      } catch (InterruptedException e) {
-        currentThread().interrupt();
-        result.completeExceptionally(new TokenUrlResponseException(tokenUrl, e));
-        return result;
-      } catch (ExecutionException e) {
-        result.completeExceptionally(new TokenUrlResponseException(tokenUrl, (Exception) e.getCause()));
-        return result;
-      }
-
-      String contentType = response.getHeaderValue(CONTENT_TYPE);
-      MediaType responseContentType = contentType != null ? parse(contentType) : ANY;
-
-      String body = IOUtils.toString(response.getEntity().getContent());
-
-      if (response.getStatusCode() >= BAD_REQUEST.getStatusCode()) {
-        result.completeExceptionally(new TokenUrlResponseException(tokenUrl, response, body));
-        return result;
-      }
-
-      MultiMap<String, String> headers = response.getHeaders();
-
-      TokenResponse tokenResponse = new TokenResponse();
-      tokenResponse
-          .setAccessToken(resolveExpression(responseAccessTokenExpr, body, headers, responseContentType));
-      if (tokenResponse.getAccessToken() == null) {
-        result.completeExceptionally(new TokenNotFoundException(tokenUrl, response, body));
-        return result;
-      }
-      if (retrieveRefreshToken) {
-        tokenResponse
-            .setRefreshToken(resolveExpression(responseRefreshTokenExpr, body, headers, responseContentType));
-      }
-      tokenResponse.setExpiresIn(resolveExpression(responseExpiresInExpr, body, headers, responseContentType));
-
-      if (customParametersExtractorsExprs != null && !customParametersExtractorsExprs.isEmpty()) {
-        Map<String, Object> customParams = new HashMap<>();
-        for (Entry<String, String> customParamExpr : customParametersExtractorsExprs.entrySet()) {
-          customParams.put(customParamExpr.getKey(),
-                           resolveExpression(customParamExpr.getValue(), body, headers, responseContentType));
-        }
-        tokenResponse.setCustomResponseParameters(customParams);
-      }
-
-      result.complete(tokenResponse);
-      return result;
-    } catch (IOException e) {
-      result.completeExceptionally(new TokenUrlResponseException(tokenUrl, e));
-      return result;
+    if (authorization != null) {
+      requestBuilder.addHeader(AUTHORIZATION, authorization);
     }
+
+    // TODO MULE-11272 Support doing non-blocking requests
+    // HttpResponse response;
+    //
+    // response =
+    return httpClient.sendAsync(requestBuilder.build(), HttpRequestOptions.builder()
+        .responseTimeout(TOKEN_REQUEST_TIMEOUT_MILLIS)
+        .build())
+        .exceptionally(t -> {
+          t.printStackTrace();
+          if (t instanceof IOException) {
+            throw new CompletionException(new TokenUrlResponseException(tokenUrl, (IOException) t));
+          } else {
+            throw new CompletionException(t);
+          }
+        })
+        .thenApply(response -> {
+          String contentType = response.getHeaderValue(CONTENT_TYPE);
+          MediaType responseContentType = contentType != null ? parse(contentType) : ANY;
+
+          String body = IOUtils.toString(response.getEntity().getContent());
+
+          if (response.getStatusCode() >= BAD_REQUEST.getStatusCode()) {
+            try {
+              throw new CompletionException(new TokenUrlResponseException(tokenUrl, response, body));
+            } catch (IOException e) {
+              throw new CompletionException(new TokenUrlResponseException(tokenUrl, e));
+            }
+          }
+
+          MultiMap<String, String> headers = response.getHeaders();
+
+          TokenResponse tokenResponse = new TokenResponse();
+          tokenResponse
+              .setAccessToken(resolveExpression(responseAccessTokenExpr, body, headers, responseContentType));
+          if (tokenResponse.getAccessToken() == null) {
+            throw new CompletionException(new TokenNotFoundException(tokenUrl, response, body));
+          }
+          if (retrieveRefreshToken) {
+            tokenResponse
+                .setRefreshToken(resolveExpression(responseRefreshTokenExpr, body, headers, responseContentType));
+          }
+          tokenResponse.setExpiresIn(resolveExpression(responseExpiresInExpr, body, headers, responseContentType));
+
+          if (customParametersExtractorsExprs != null && !customParametersExtractorsExprs.isEmpty()) {
+            Map<String, Object> customParams = new HashMap<>();
+            for (Entry<String, String> customParamExpr : customParametersExtractorsExprs.entrySet()) {
+              customParams.put(customParamExpr.getKey(),
+                               resolveExpression(customParamExpr.getValue(), body, headers, responseContentType));
+            }
+            tokenResponse.setCustomResponseParameters(customParams);
+          }
+
+          return tokenResponse;
+        });
+
+    //
+    //
+    // try {
+    // response = httpClient.sendAsync(requestBuilder.build(), HttpRequestOptions.builder()
+    // .responseTimeout(TOKEN_REQUEST_TIMEOUT_MILLIS)
+    // .build()).get();
+    // } catch (InterruptedException e) {
+    // currentThread().interrupt();
+    // result.completeExceptionally(new TokenUrlResponseException(tokenUrl, e));
+    // return result;
+    // } catch (ExecutionException e) {
+    // result.completeExceptionally(new TokenUrlResponseException(tokenUrl, (Exception) e.getCause()));
+    // return result;
+    // }
+    //
+    // String contentType = response.getHeaderValue(CONTENT_TYPE);
+    // MediaType responseContentType = contentType != null ? parse(contentType) : ANY;
+    //
+    // String body = IOUtils.toString(response.getEntity().getContent());
+    //
+    // if (response.getStatusCode() >= BAD_REQUEST.getStatusCode()) {
+    // result.completeExceptionally(new TokenUrlResponseException(tokenUrl, response, body));
+    // return result;
+    // }
+    //
+    // MultiMap<String, String> headers = response.getHeaders();
+    //
+    // TokenResponse tokenResponse = new TokenResponse();
+    // tokenResponse
+    // .setAccessToken(resolveExpression(responseAccessTokenExpr, body, headers, responseContentType));
+    // if (tokenResponse.getAccessToken() == null) {
+    // result.completeExceptionally(new TokenNotFoundException(tokenUrl, response, body));
+    // return result;
+    // }
+    // if (retrieveRefreshToken) {
+    // tokenResponse
+    // .setRefreshToken(resolveExpression(responseRefreshTokenExpr, body, headers, responseContentType));
+    // }
+    // tokenResponse.setExpiresIn(resolveExpression(responseExpiresInExpr, body, headers, responseContentType));
+    //
+    // if (customParametersExtractorsExprs != null && !customParametersExtractorsExprs.isEmpty()) {
+    // Map<String, Object> customParams = new HashMap<>();
+    // for (Entry<String, String> customParamExpr : customParametersExtractorsExprs.entrySet()) {
+    // customParams.put(customParamExpr.getKey(),
+    // resolveExpression(customParamExpr.getValue(), body, headers, responseContentType));
+    // }
+    // tokenResponse.setCustomResponseParameters(customParams);
+    // }
+    //
+    // result.complete(tokenResponse);
+    // return result;
+    // } catch (IOException e) {
+    // result.completeExceptionally(new TokenUrlResponseException(tokenUrl, e));
+    // return result;
+    // }
   }
 
   protected <T> T resolveExpression(String expr, Object body, MultiMap<String, String> headers,

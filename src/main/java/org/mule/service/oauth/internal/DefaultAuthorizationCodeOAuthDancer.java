@@ -238,16 +238,18 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
       invokeTokenUrl(tokenUrl, formData, authorization, true, encoding)
           .exceptionally(e -> {
             LOGGER.error(e.getMessage());
-            if (e instanceof TokenUrlResponseException) {
+            if (e.getCause() instanceof TokenUrlResponseException) {
               sendResponse(stateDecoder, responseCallback, INTERNAL_SERVER_ERROR,
                            format("Failure calling token url %s. Exception message is %s", tokenUrl, e.getMessage()),
                            TOKEN_URL_CALL_FAILED_STATUS);
 
-            } else if (e instanceof TokenNotFoundException) {
+            } else if (e.getCause() instanceof TokenNotFoundException) {
               sendResponse(stateDecoder, responseCallback, INTERNAL_SERVER_ERROR,
                            "Failed getting access token or refresh token from token URL response. See logs for details.",
                            TOKEN_NOT_FOUND_STATUS);
 
+            } else {
+              LOGGER.error(e.getMessage(), e);
             }
             return null;
           }).thenAccept(tokenResponse -> {
