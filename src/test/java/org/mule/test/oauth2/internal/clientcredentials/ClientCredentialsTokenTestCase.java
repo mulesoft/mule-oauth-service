@@ -10,11 +10,13 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.core.IsCollectionContaining.hasItem;
 import static org.hamcrest.text.IsEqualIgnoringCase.equalToIgnoringCase;
 import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mule.runtime.http.api.HttpHeaders.Names.AUTHORIZATION;
 
@@ -24,12 +26,31 @@ import org.mule.runtime.oauth.api.ClientCredentialsOAuthDancer;
 import org.mule.runtime.oauth.api.builder.OAuthClientCredentialsDancerBuilder;
 import org.mule.test.oauth.AbstractOAuthTestCase;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.commons.io.IOUtils;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 
 public class ClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
+
+  @Test
+  public void refreshTokenAfterInvalidate() throws Exception {
+    final Map<Object, Object> tokensStore = new HashMap<>();
+    final OAuthClientCredentialsDancerBuilder builder = baseClientCredentialsDancerBuilder(tokensStore);
+    builder.tokenUrl("http://host/token");
+    ClientCredentialsOAuthDancer minimalDancer = startDancer(builder);
+
+    assertThat(minimalDancer.accessToken().get(), not(nullValue()));
+    tokensStore.clear();
+    assertThat(minimalDancer.accessToken().get(), not(nullValue()));
+    verify(httpClient, times(2)).sendAsync(any(HttpRequest.class), any(HttpRequestOptions.class));
+
+  }
+
 
   @Test
   public void clientCredentialsEncodedInHeader() throws Exception {

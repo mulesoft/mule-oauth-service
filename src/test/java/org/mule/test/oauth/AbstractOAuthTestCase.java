@@ -37,6 +37,7 @@ import org.junit.Before;
 
 import java.io.StringReader;
 import java.util.HashMap;
+import java.util.Map;
 
 import javax.inject.Inject;
 
@@ -83,6 +84,14 @@ public abstract class AbstractOAuthTestCase extends AbstractMuleContextTestCase 
   protected OAuthClientCredentialsDancerBuilder baseClientCredentialsDancerBuilder() {
     final OAuthClientCredentialsDancerBuilder builder =
         service.clientCredentialsGrantTypeDancerBuilder(lockFactory, new HashMap<>(), mock(MuleExpressionLanguage.class));
+
+    builder.clientCredentials("clientId", "clientSecret");
+    return builder;
+  }
+
+  protected OAuthClientCredentialsDancerBuilder baseClientCredentialsDancerBuilder(Map tokensStore) {
+    final OAuthClientCredentialsDancerBuilder builder =
+        service.clientCredentialsGrantTypeDancerBuilder(lockFactory, tokensStore, mock(MuleExpressionLanguage.class));
 
     builder.clientCredentials("clientId", "clientSecret");
     return builder;

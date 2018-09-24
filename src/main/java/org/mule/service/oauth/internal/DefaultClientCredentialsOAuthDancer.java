@@ -87,24 +87,13 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
   public CompletableFuture<String> accessToken() throws RequestAuthenticationException {
     if (!accessTokenRefreshedOnStart) {
       accessTokenRefreshedOnStart = true;
-      try {
-        refreshToken().get();
-      } catch (InterruptedException e) {
-        currentThread().interrupt();
-        final CompletableFuture<String> exceptionFuture = new CompletableFuture<>();
-        exceptionFuture.completeExceptionally(e);
-        return exceptionFuture;
-      } catch (ExecutionException e) {
-        final CompletableFuture<String> exceptionFuture = new CompletableFuture<>();
-        exceptionFuture.completeExceptionally(e.getCause());
-        return exceptionFuture;
-      }
+      return refreshToken().thenApply(v -> getContext().getAccessToken());
     }
 
     final String accessToken = getContext().getAccessToken();
     if (accessToken == null) {
-      throw new RequestAuthenticationException(createStaticMessage(format("No access token found. "
-          + "Verify that you have authenticated before trying to execute an operation to the API.")));
+      LOGGER.info("Previously stored token has been invalidated. Refreshing...");
+      return refreshToken().thenApply(v -> getContext().getAccessToken());
     }
 
     // TODO MULE-11858 proactively refresh if the token has already expired based on its 'expiresIn' parameter
