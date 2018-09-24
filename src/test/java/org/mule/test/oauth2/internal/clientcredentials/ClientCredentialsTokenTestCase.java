@@ -32,14 +32,13 @@ import java.util.Map;
 import org.apache.commons.io.IOUtils;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
 
 public class ClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
 
   @Test
   public void refreshTokenAfterInvalidate() throws Exception {
-    final Map<Object, Object> tokensStore = new HashMap<>();
+    final Map<String, ?> tokensStore = new HashMap<>();
     final OAuthClientCredentialsDancerBuilder builder = baseClientCredentialsDancerBuilder(tokensStore);
     builder.tokenUrl("http://host/token");
     ClientCredentialsOAuthDancer minimalDancer = startDancer(builder);
@@ -48,9 +47,7 @@ public class ClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
     tokensStore.clear();
     assertThat(minimalDancer.accessToken().get(), not(nullValue()));
     verify(httpClient, times(2)).sendAsync(any(HttpRequest.class), any(HttpRequestOptions.class));
-
   }
-
 
   @Test
   public void clientCredentialsEncodedInHeader() throws Exception {

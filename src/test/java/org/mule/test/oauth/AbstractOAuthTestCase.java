@@ -82,14 +82,10 @@ public abstract class AbstractOAuthTestCase extends AbstractMuleContextTestCase 
   }
 
   protected OAuthClientCredentialsDancerBuilder baseClientCredentialsDancerBuilder() {
-    final OAuthClientCredentialsDancerBuilder builder =
-        service.clientCredentialsGrantTypeDancerBuilder(lockFactory, new HashMap<>(), mock(MuleExpressionLanguage.class));
-
-    builder.clientCredentials("clientId", "clientSecret");
-    return builder;
+    return baseClientCredentialsDancerBuilder(new HashMap<>());
   }
 
-  protected OAuthClientCredentialsDancerBuilder baseClientCredentialsDancerBuilder(Map tokensStore) {
+  protected OAuthClientCredentialsDancerBuilder baseClientCredentialsDancerBuilder(Map<String, ?> tokensStore) {
     final OAuthClientCredentialsDancerBuilder builder =
         service.clientCredentialsGrantTypeDancerBuilder(lockFactory, tokensStore, mock(MuleExpressionLanguage.class));
 
