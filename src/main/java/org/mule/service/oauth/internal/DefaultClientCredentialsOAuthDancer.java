@@ -6,10 +6,8 @@
  */
 package org.mule.service.oauth.internal;
 
-import static java.lang.String.format;
 import static java.lang.Thread.currentThread;
 import static java.util.concurrent.CompletableFuture.completedFuture;
-import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_CLIENT_CREDENTIALS;
@@ -38,6 +36,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 
 /**
@@ -67,6 +67,11 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
   @Override
   public void start() throws MuleException {
     super.start();
+    // We use a reentrant instead of one from the lock factory because the local state of this object cannot be shared in the
+    // cluster.
+    // For this to work within a cluster we would need some notifications mechaniusm from the object store to know when a token
+    // was refreshen in another node.
+    refreshTokenLock = new ReentrantLock();
     try {
       refreshToken().get();
       accessTokenRefreshedOnStart = true;
@@ -100,8 +105,31 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
     return completedFuture(accessToken);
   }
 
+  private volatile CompletableFuture<Void> lastRefreshTokenFuture;
+  private Lock refreshTokenLock;
+
   @Override
   public CompletableFuture<Void> refreshToken() {
+    boolean lockWasAcqired = refreshTokenLock.tryLock();
+
+    if (lockWasAcqired) {
+      try {
+        lastRefreshTokenFuture = doRefreshToken();
+        return lastRefreshTokenFuture;
+      } finally {
+        refreshTokenLock.unlock();
+      }
+    } else {
+      refreshTokenLock.lock();
+      try {
+        return lastRefreshTokenFuture;
+      } finally {
+        refreshTokenLock.unlock();
+      }
+    }
+  }
+
+  private CompletableFuture<Void> doRefreshToken() {
     final Map<String, String> formData = new HashMap<>();
 
     formData.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_CLIENT_CREDENTIALS);
