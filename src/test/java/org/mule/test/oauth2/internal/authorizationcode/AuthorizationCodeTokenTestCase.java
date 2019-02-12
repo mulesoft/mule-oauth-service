@@ -54,7 +54,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
 
-  protected ArgumentCaptor<RequestHandler> localCallbackCaptor = forClass(RequestHandler.class);
+  private ArgumentCaptor<RequestHandler> localCallbackCaptor = forClass(RequestHandler.class);
 
   @Before
   public void before() {
