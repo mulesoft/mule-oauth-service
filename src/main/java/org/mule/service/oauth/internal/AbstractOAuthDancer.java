@@ -7,6 +7,7 @@
 package org.mule.service.oauth.internal;
 
 import static java.lang.String.format;
+import static java.net.URLEncoder.encode;
 import static java.util.Collections.singletonMap;
 import static org.apache.commons.codec.binary.Base64.encodeBase64String;
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -20,6 +21,8 @@ import static org.mule.runtime.http.api.HttpHeaders.Names.AUTHORIZATION;
 import static org.mule.runtime.http.api.HttpHeaders.Names.CONTENT_TYPE;
 import static org.mule.runtime.http.api.HttpHeaders.Values.APPLICATION_X_WWW_FORM_URLENCODED;
 import static org.mule.runtime.http.api.utils.HttpEncoderDecoderUtils.encodeString;
+import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.BASIC_AUTH_HEADER;
+import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.QUERY_PARAMS;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
 import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_ID_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_SECRET_PARAMETER;
@@ -27,6 +30,7 @@ import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_SECRET_PARAM
 import org.mule.runtime.api.el.BindingContext;
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.MuleException;
+import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.lifecycle.Startable;
 import org.mule.runtime.api.lifecycle.Stoppable;
 import org.mule.runtime.api.lock.LockFactory;
@@ -40,6 +44,7 @@ import org.mule.runtime.http.api.client.HttpRequestOptions;
 import org.mule.runtime.http.api.domain.entity.ByteArrayHttpEntity;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
 import org.mule.runtime.http.api.domain.message.request.HttpRequestBuilder;
+import org.mule.runtime.oauth.api.builder.ClientCredentialsLocation;
 import org.mule.runtime.oauth.api.exception.TokenNotFoundException;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
 import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
@@ -47,6 +52,7 @@ import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
 import org.mule.service.oauth.internal.state.TokenResponse;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
@@ -70,7 +76,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   protected final String tokenUrl;
   protected final Charset encoding;
   protected final String scopes;
-  protected final boolean encodeClientCredentialsInBody;
+  protected final ClientCredentialsLocation clientCredentialsLocation;
 
   protected final String responseAccessTokenExpr;
   protected final String responseRefreshTokenExpr;
@@ -84,7 +90,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   private final MuleExpressionLanguage expressionEvaluator;
 
   protected AbstractOAuthDancer(String clientId, String clientSecret, String tokenUrl, Charset encoding, String scopes,
-                                boolean encodeClientCredentialsInBody, String responseAccessTokenExpr,
+                                ClientCredentialsLocation clientCredentialsLocation, String responseAccessTokenExpr,
                                 String responseRefreshTokenExpr, String responseExpiresInExpr,
                                 Map<String, String> customParametersExtractorsExprs,
                                 Function<String, String> resourceOwnerIdTransformer, LockFactory lockProvider,
@@ -95,7 +101,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     this.tokenUrl = tokenUrl;
     this.encoding = encoding;
     this.scopes = scopes;
-    this.encodeClientCredentialsInBody = encodeClientCredentialsInBody;
+    this.clientCredentialsLocation = clientCredentialsLocation;
     this.responseAccessTokenExpr = responseAccessTokenExpr;
     this.responseRefreshTokenExpr = responseRefreshTokenExpr;
     this.responseExpiresInExpr = responseExpiresInExpr;
@@ -119,26 +125,27 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   }
 
   /**
-   * Based on the value of {@code encodeClientCredentialsInBody}, add the clientId and clientSecret values to the form or encode
+   * Based on the value of {@code clientCredentialsLocation}, add the clientId and clientSecret values to the form or encode
    * and return them.
    *
    * @param formData
-   * @param encodeClientCredentialsInBody
-   * @return
    */
-  protected String handleClientCredentials(final Map<String, String> formData, boolean encodeClientCredentialsInBody) {
-    if (encodeClientCredentialsInBody) {
-      formData.put(CLIENT_ID_PARAMETER, clientId);
-      formData.put(CLIENT_SECRET_PARAMETER, clientSecret);
-      return null;
-    } else {
-      return "Basic " + encodeBase64String(format("%s:%s", clientId, clientSecret).getBytes());
+  protected String handleClientCredentials(final Map<String, String> formData) {
+    switch (clientCredentialsLocation) {
+      case BASIC_AUTH_HEADER:
+        return "Basic " + encodeBase64String(format("%s:%s", clientId, clientSecret).getBytes());
+      case BODY:
+        formData.put(CLIENT_ID_PARAMETER, clientId);
+        formData.put(CLIENT_SECRET_PARAMETER, clientSecret);
     }
+    return null;
   }
 
-  protected CompletableFuture<TokenResponse> invokeTokenUrl(String tokenUrl, Map<String, String> tokenRequestFormToSend,
+  protected CompletableFuture<TokenResponse> invokeTokenUrl(String tokenUrl,
+                                                            Map<String, String> tokenRequestFormToSend,
                                                             String authorization,
-                                                            boolean retrieveRefreshToken, Charset encoding) {
+                                                            boolean retrieveRefreshToken,
+                                                            Charset encoding) {
     final HttpRequestBuilder requestBuilder = HttpRequest.builder()
         .uri(tokenUrl).method(POST.name())
         .entity(new ByteArrayHttpEntity(encodeString(tokenRequestFormToSend, encoding).getBytes()))
@@ -146,6 +153,13 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
 
     if (authorization != null) {
       requestBuilder.addHeader(AUTHORIZATION, authorization);
+    } else if (QUERY_PARAMS.equals(clientCredentialsLocation)) {
+      try {
+        requestBuilder.addQueryParam(CLIENT_ID_PARAMETER, encode(clientId, encoding.name()));
+        requestBuilder.addQueryParam(CLIENT_SECRET_PARAMETER, encode(clientSecret, encoding.name()));
+      } catch (UnsupportedEncodingException e) {
+        throw new MuleRuntimeException(e);
+      }
     }
 
     return httpClient.sendAsync(requestBuilder.build(), HttpRequestOptions.builder()

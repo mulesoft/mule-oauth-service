@@ -22,6 +22,7 @@ import org.mule.runtime.api.lifecycle.Startable;
 import org.mule.runtime.api.lock.LockFactory;
 import org.mule.runtime.http.api.client.HttpClient;
 import org.mule.runtime.oauth.api.ClientCredentialsOAuthDancer;
+import org.mule.runtime.oauth.api.builder.ClientCredentialsLocation;
 import org.mule.runtime.oauth.api.exception.RequestAuthenticationException;
 import org.mule.runtime.oauth.api.exception.TokenNotFoundException;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
@@ -52,13 +53,13 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
   private boolean accessTokenRefreshedOnStart = false;
 
   public DefaultClientCredentialsOAuthDancer(String clientId, String clientSecret, String tokenUrl, String scopes,
-                                             boolean encodeClientCredentialsInBody, Charset encoding,
+                                             ClientCredentialsLocation clientCredentialsLocation, Charset encoding,
                                              String responseAccessTokenExpr, String responseRefreshTokenExpr,
                                              String responseExpiresInExpr, Map<String, String> customParametersExprs,
                                              Function<String, String> resourceOwnerIdTransformer, LockFactory lockProvider,
                                              Map<String, DefaultResourceOwnerOAuthContext> tokensStore, HttpClient httpClient,
                                              MuleExpressionLanguage expressionEvaluator) {
-    super(clientId, clientSecret, tokenUrl, encoding, scopes, encodeClientCredentialsInBody, responseAccessTokenExpr,
+    super(clientId, clientSecret, tokenUrl, encoding, scopes, clientCredentialsLocation, responseAccessTokenExpr,
           responseRefreshTokenExpr, responseExpiresInExpr, customParametersExprs, resourceOwnerIdTransformer, lockProvider,
           tokensStore, httpClient,
           expressionEvaluator);
@@ -136,7 +137,7 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
     if (scopes != null) {
       formData.put(SCOPE_PARAMETER, scopes);
     }
-    String authorization = handleClientCredentials(formData, encodeClientCredentialsInBody);
+    String authorization = handleClientCredentials(formData);
 
     return invokeTokenUrl(tokenUrl, formData, authorization, false, encoding).thenAccept(tokenResponse -> {
       withContextClassLoader(DefaultClientCredentialsOAuthDancer.class.getClassLoader(), () -> {

@@ -9,6 +9,7 @@ package org.mule.test.oauth2.internal.authorizationcode;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singleton;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.core.IsCollectionContaining.hasItem;
@@ -22,6 +23,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mule.runtime.http.api.HttpConstants.Method.GET;
 import static org.mule.runtime.http.api.HttpHeaders.Names.AUTHORIZATION;
+import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.BASIC_AUTH_HEADER;
+import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.BODY;
+import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.QUERY_PARAMS;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
 import static org.mule.service.oauth.internal.OAuthConstants.CODE_PARAMETER;
 
@@ -50,7 +54,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
 
-  private ArgumentCaptor<RequestHandler> localCallbackCaptor = forClass(RequestHandler.class);
+  protected ArgumentCaptor<RequestHandler> localCallbackCaptor = forClass(RequestHandler.class);
 
   @Before
   public void before() {
@@ -60,15 +64,18 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
         .thenReturn(mock(RequestHandlerManager.class));
   }
 
-  @Test
-  public void authCodeCredentialsEncodedInHeader() throws Exception {
+  private void assertAuthCodeCredentialsEncodedInHeader(boolean useDeprecatedMethod) throws Exception {
     final OAuthAuthorizationCodeDancerBuilder builder = baseAuthCodeDancerbuilder();
     builder.tokenUrl("http://host/token");
     builder.authorizationUrl("http://host/auth");
     builder.localCallback(httpServer, "/localCallback");
     builder.localAuthorizationUrlPath("/auth");
     builder.clientCredentials("Aladdin", "open sesame");
-    builder.encodeClientCredentialsInBody(false);
+    if (useDeprecatedMethod) {
+      builder.encodeClientCredentialsInBody(false);
+    } else {
+      builder.withClientCredentialsIn(BASIC_AUTH_HEADER);
+    }
 
     AuthorizationCodeOAuthDancer minimalDancer = startDancer(builder);
     localCallbackCaptor.getValue().handleRequest(buildLocalCallbackRequestContext(), mock(HttpResponseReadyCallback.class));
@@ -78,6 +85,9 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
 
     assertThat(requestCaptor.getValue().getHeaderValue(AUTHORIZATION), is("Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=="));
 
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_id"))));
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_secret"))));
+
     String requestBody = IOUtils.toString(requestCaptor.getValue().getEntity().getContent(), UTF_8);
     assertThat(requestBody, containsString("code=authCode"));
     assertThat(requestBody, containsString("grant_type=authorization_code"));
@@ -86,7 +96,17 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
   }
 
   @Test
-  public void authCodeCredentialsInBody() throws Exception {
+  public void authCodeCredentialsEncodedInHeader() throws Exception {
+    assertAuthCodeCredentialsEncodedInHeader(false);
+  }
+
+  @Test
+  public void authCodeCredentialsEncodedInHeaderCompatibility() throws Exception {
+    assertAuthCodeCredentialsEncodedInHeader(true);
+  }
+
+  @Test
+  public void authCodeCredentialsInBodyByDefault() throws Exception {
     final OAuthAuthorizationCodeDancerBuilder builder = baseAuthCodeDancerbuilder();
     builder.tokenUrl("http://host/token");
     builder.authorizationUrl("http://host/auth");
@@ -102,6 +122,9 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
 
     assertThat(requestCaptor.getValue().getHeaderNames(), not(hasItem(equalToIgnoringCase(AUTHORIZATION))));
 
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_id"))));
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_secret"))));
+
     String requestBody = IOUtils.toString(requestCaptor.getValue().getEntity().getContent(), UTF_8);
     assertThat(requestBody, containsString("grant_type=authorization_code"));
     assertThat(requestBody, containsString("client_secret=open+sesame"));
@@ -109,7 +132,48 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
     assertThat(requestBody, containsString("code=authCode"));
   }
 
-  private HttpRequestContext buildLocalCallbackRequestContext() {
+  private void assertAuthCodeCredentialsInBody(boolean useDeprecatedMethod) throws Exception {
+    final OAuthAuthorizationCodeDancerBuilder builder = baseAuthCodeDancerbuilder();
+    builder.tokenUrl("http://host/token");
+    builder.authorizationUrl("http://host/auth");
+    builder.localCallback(httpServer, "/localCallback");
+    builder.localAuthorizationUrlPath("/auth");
+    builder.clientCredentials("Aladdin", "open sesame");
+    if (useDeprecatedMethod) {
+      builder.encodeClientCredentialsInBody(true);
+    } else {
+      builder.withClientCredentialsIn(BODY);
+    }
+
+    AuthorizationCodeOAuthDancer minimalDancer = startDancer(builder);
+    localCallbackCaptor.getValue().handleRequest(buildLocalCallbackRequestContext(), mock(HttpResponseReadyCallback.class));
+
+    ArgumentCaptor<HttpRequest> requestCaptor = forClass(HttpRequest.class);
+    verify(httpClient).sendAsync(requestCaptor.capture(), any(HttpRequestOptions.class));
+
+    assertThat(requestCaptor.getValue().getHeaderNames(), not(hasItem(equalToIgnoringCase(AUTHORIZATION))));
+
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_id"))));
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_secret"))));
+
+    String requestBody = IOUtils.toString(requestCaptor.getValue().getEntity().getContent(), UTF_8);
+    assertThat(requestBody, containsString("grant_type=authorization_code"));
+    assertThat(requestBody, containsString("client_secret=open+sesame"));
+    assertThat(requestBody, containsString("client_id=Aladdin"));
+    assertThat(requestBody, containsString("code=authCode"));
+  }
+
+  @Test
+  public void authCodeCredentialsInBodyCompatibility() throws Exception {
+    assertAuthCodeCredentialsInBody(true);
+  }
+
+  @Test
+  public void authCodeCredentialsInBody() throws Exception {
+    assertAuthCodeCredentialsInBody(false);
+  }
+
+  protected HttpRequestContext buildLocalCallbackRequestContext() {
     HttpRequest request = mock(HttpRequest.class);
     MultiMap<String, String> queryParams = new MultiMap<>();
     queryParams.put(CODE_PARAMETER, "authCode");
@@ -120,13 +184,16 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
     return requestContext;
   }
 
-  @Test
-  public void authCodeCredentialsEncodedInHeaderRefresh() throws Exception {
+  private void assertAuthCodeCredentialsEncodedInHeaderRefresh(boolean useDeprecatedMethod) throws Exception {
     final OAuthAuthorizationCodeDancerBuilder builder = baseAuthCodeDancerbuilder();
     builder.tokenUrl("http://host/token");
     builder.authorizationUrl("http://host/auth");
     builder.clientCredentials("Aladdin", "open sesame");
-    builder.encodeClientCredentialsInBody(false);
+    if (useDeprecatedMethod) {
+      builder.encodeClientCredentialsInBody(false);
+    } else {
+      builder.withClientCredentialsIn(BASIC_AUTH_HEADER);
+    }
 
     AuthorizationCodeOAuthDancer minimalDancer = startDancer(builder);
     minimalDancer.refreshToken(null);
@@ -136,6 +203,9 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
 
     assertThat(requestCaptor.getValue().getHeaderValue(AUTHORIZATION), is("Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=="));
 
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_id"))));
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_secret"))));
+
     String requestBody = IOUtils.toString(requestCaptor.getValue().getEntity().getContent(), UTF_8);
     assertThat(requestBody, containsString("grant_type=refresh_token"));
     assertThat(requestBody, not(containsString("client_secret=open+sesame")));
@@ -143,7 +213,17 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
   }
 
   @Test
-  public void authCodeCredentialsInBodyRefresh() throws Exception {
+  public void authCodeCredentialsEncodedInHeaderRefreshCompatibility() throws Exception {
+    assertAuthCodeCredentialsEncodedInHeaderRefresh(true);
+  }
+
+  @Test
+  public void authCodeCredentialsEncodedInHeaderRefresh() throws Exception {
+    assertAuthCodeCredentialsEncodedInHeaderRefresh(false);
+  }
+
+  @Test
+  public void authCodeCredentialsInBodyRefreshByDefault() throws Exception {
     final OAuthAuthorizationCodeDancerBuilder builder = baseAuthCodeDancerbuilder();
     builder.tokenUrl("http://host/token");
     builder.authorizationUrl("http://host/auth");
@@ -157,10 +237,80 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
 
     assertThat(requestCaptor.getValue().getHeaderNames(), not(hasItem(equalToIgnoringCase(AUTHORIZATION))));
 
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_id"))));
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_secret"))));
+
     String requestBody = IOUtils.toString(requestCaptor.getValue().getEntity().getContent(), UTF_8);
     assertThat(requestBody, containsString("grant_type=refresh_token"));
     assertThat(requestBody, containsString("client_secret=open+sesame"));
     assertThat(requestBody, containsString("client_id=Aladdin"));
+  }
+
+  private void assertAuthCodeCredentialsInBodyRefresh(boolean useDeprecatedMethod) throws Exception {
+    final OAuthAuthorizationCodeDancerBuilder builder = baseAuthCodeDancerbuilder();
+    builder.tokenUrl("http://host/token");
+    builder.authorizationUrl("http://host/auth");
+    builder.clientCredentials("Aladdin", "open sesame");
+
+    if (useDeprecatedMethod) {
+      builder.encodeClientCredentialsInBody(true);
+    } else {
+      builder.withClientCredentialsIn(BODY);
+    }
+
+    AuthorizationCodeOAuthDancer minimalDancer = startDancer(builder);
+    minimalDancer.refreshToken(null);
+
+    ArgumentCaptor<HttpRequest> requestCaptor = forClass(HttpRequest.class);
+    verify(httpClient).sendAsync(requestCaptor.capture(), any(HttpRequestOptions.class));
+
+    assertThat(requestCaptor.getValue().getHeaderNames(), not(hasItem(equalToIgnoringCase(AUTHORIZATION))));
+
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_id"))));
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_secret"))));
+
+    String requestBody = IOUtils.toString(requestCaptor.getValue().getEntity().getContent(), UTF_8);
+    assertThat(requestBody, containsString("grant_type=refresh_token"));
+    assertThat(requestBody, containsString("client_secret=open+sesame"));
+    assertThat(requestBody, containsString("client_id=Aladdin"));
+  }
+
+  @Test
+  public void authCodeCredentialsInBodyRefreshCompatibility() throws Exception {
+    assertAuthCodeCredentialsInBodyRefresh(true);
+  }
+
+  @Test
+  public void authCodeCredentialsInBodyRefresh() throws Exception {
+    assertAuthCodeCredentialsInBodyRefresh(false);
+  }
+
+  @Test
+  public void authCodeCredentialsAsQueryParams() throws Exception {
+    final OAuthAuthorizationCodeDancerBuilder builder = baseAuthCodeDancerbuilder();
+    builder.tokenUrl("http://host/token");
+    builder.authorizationUrl("http://host/auth");
+    builder.localCallback(httpServer, "/localCallback");
+    builder.localAuthorizationUrlPath("/auth");
+    builder.clientCredentials("Aladdin", "openSesame");
+    builder.withClientCredentialsIn(QUERY_PARAMS);
+
+    AuthorizationCodeOAuthDancer minimalDancer = startDancer(builder);
+    localCallbackCaptor.getValue().handleRequest(buildLocalCallbackRequestContext(), mock(HttpResponseReadyCallback.class));
+
+    ArgumentCaptor<HttpRequest> requestCaptor = forClass(HttpRequest.class);
+    verify(httpClient).sendAsync(requestCaptor.capture(), any(HttpRequestOptions.class));
+
+    assertThat(requestCaptor.getValue().getQueryParams().get("client_id"), is("Aladdin"));
+    assertThat(requestCaptor.getValue().getQueryParams().get("client_secret"), is("openSesame"));
+
+    assertThat(requestCaptor.getValue().getHeaderNames(), not(hasItem(equalToIgnoringCase(AUTHORIZATION))));
+
+    String requestBody = IOUtils.toString(requestCaptor.getValue().getEntity().getContent(), UTF_8);
+    assertThat(requestBody, containsString("code=authCode"));
+    assertThat(requestBody, containsString("grant_type=authorization_code"));
+    assertThat(requestBody, not(containsString("client_secret=openSesame")));
+    assertThat(requestBody, not(containsString("client_id=Aladdin")));
   }
 
   @Override

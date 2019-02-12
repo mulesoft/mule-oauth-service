@@ -12,6 +12,7 @@ import static java.util.Optional.empty;
 import static java.util.Optional.of;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.mule.runtime.api.util.Preconditions.checkArgument;
+import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.BODY;
 
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.MuleRuntimeException;
@@ -60,7 +61,7 @@ public class DefaultOAuthAuthorizationCodeDancerBuilder extends AbstractOAuthDan
                                                     Map<String, DefaultResourceOwnerOAuthContext> tokensStore,
                                                     HttpService httpService, MuleExpressionLanguage expressionEvaluator) {
     super(lockProvider, tokensStore, httpService, expressionEvaluator);
-    encodeClientCredentialsInBody = true;
+    clientCredentialsLocation = BODY;
   }
 
   @Override
@@ -178,7 +179,7 @@ public class DefaultOAuthAuthorizationCodeDancerBuilder extends AbstractOAuthDan
     Optional<HttpServer> httpServer = localCallbackServerFactory != null ? of(localCallbackServerFactory.get()) : empty();
 
     return new DefaultAuthorizationCodeOAuthDancer(httpServer, clientId, clientSecret,
-                                                   tokenUrl, scopes, encodeClientCredentialsInBody, externalCallbackUrl, encoding,
+                                                   tokenUrl, scopes, clientCredentialsLocation, externalCallbackUrl, encoding,
                                                    localCallbackUrlPath, localAuthorizationUrlPath,
                                                    localAuthorizationUrlResourceOwnerId, state,
                                                    authorizationUrl, responseAccessTokenExpr, responseRefreshTokenExpr,

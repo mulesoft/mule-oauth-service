@@ -8,6 +8,8 @@ package org.mule.service.oauth.internal.builder;
 
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.BASIC_AUTH_HEADER;
+import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.BODY;
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.lock.LockFactory;
 import org.mule.runtime.api.tls.TlsContextFactory;
@@ -19,6 +21,7 @@ import org.mule.runtime.http.api.client.HttpRequestOptions;
 import org.mule.runtime.http.api.client.proxy.ProxyConfig;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
 import org.mule.runtime.http.api.domain.message.response.HttpResponse;
+import org.mule.runtime.oauth.api.builder.ClientCredentialsLocation;
 import org.mule.runtime.oauth.api.builder.OAuthDancerBuilder;
 import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 
@@ -39,7 +42,7 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
 
   protected String clientId;
   protected String clientSecret;
-  protected boolean encodeClientCredentialsInBody = false;
+  protected ClientCredentialsLocation clientCredentialsLocation = BASIC_AUTH_HEADER;
   protected String tokenUrl;
   protected Supplier<HttpClient> httpClientFactory;
 
@@ -66,8 +69,16 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
     return this;
   }
 
+  @Deprecated
   public OAuthDancerBuilder encodeClientCredentialsInBody(boolean encodeClientCredentialsInBody) {
-    this.encodeClientCredentialsInBody = encodeClientCredentialsInBody;
+    if (encodeClientCredentialsInBody) {
+      return withClientCredentialsIn(BODY);
+    }
+    return withClientCredentialsIn(BASIC_AUTH_HEADER);
+  }
+
+  public OAuthDancerBuilder withClientCredentialsIn(ClientCredentialsLocation clientCredentialsLocation) {
+    this.clientCredentialsLocation = clientCredentialsLocation;
     return this;
   }
 

@@ -69,6 +69,7 @@ import org.mule.runtime.http.api.server.async.ResponseStatusCallback;
 import org.mule.runtime.oauth.api.AuthorizationCodeOAuthDancer;
 import org.mule.runtime.oauth.api.AuthorizationCodeRequest;
 import org.mule.runtime.oauth.api.builder.AuthorizationCodeDanceCallbackContext;
+import org.mule.runtime.oauth.api.builder.ClientCredentialsLocation;
 import org.mule.runtime.oauth.api.exception.RequestAuthenticationException;
 import org.mule.runtime.oauth.api.exception.TokenNotFoundException;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
@@ -123,7 +124,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
   private RequestHandlerManager localAuthorizationUrlHandlerManager;
 
   public DefaultAuthorizationCodeOAuthDancer(Optional<HttpServer> httpServer, String clientId, String clientSecret,
-                                             String tokenUrl, String scopes, boolean encodeClientCredentialsInBody,
+                                             String tokenUrl, String scopes, ClientCredentialsLocation clientCredentialsLocation,
                                              String externalCallbackUrl, Charset encoding,
                                              String localCallbackUrlPath, String localAuthorizationUrlPath,
                                              String localAuthorizationUrlResourceOwnerId, String state, String authorizationUrl,
@@ -135,7 +136,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
                                              HttpClient httpClient, MuleExpressionLanguage expressionEvaluator,
                                              Function<AuthorizationCodeRequest, AuthorizationCodeDanceCallbackContext> beforeDanceCallback,
                                              BiConsumer<AuthorizationCodeDanceCallbackContext, ResourceOwnerOAuthContext> afterDanceCallback) {
-    super(clientId, clientSecret, tokenUrl, encoding, scopes, encodeClientCredentialsInBody, responseAccessTokenExpr,
+    super(clientId, clientSecret, tokenUrl, encoding, scopes, clientCredentialsLocation, responseAccessTokenExpr,
           responseRefreshTokenExpr,
           responseExpiresInExpr, customParametersExtractorsExprs, resourceOwnerIdTransformer, lockProvider, tokensStore,
           httpClient, expressionEvaluator);
@@ -249,7 +250,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
 
         final Map<String, String> formData = new HashMap<>();
         formData.put(CODE_PARAMETER, authorizationCode);
-        String authorization = handleClientCredentials(formData, encodeClientCredentialsInBody);
+        String authorization = handleClientCredentials(formData);
         formData.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_AUTHENTICATION_CODE);
         formData.put(REDIRECT_URI_PARAMETER, externalCallbackUrl);
 
@@ -507,7 +508,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
 
         final Map<String, String> formData = new HashMap<>();
         formData.put(REFRESH_TOKEN_PARAMETER, userRefreshToken);
-        String authorization = handleClientCredentials(formData, encodeClientCredentialsInBody);
+        String authorization = handleClientCredentials(formData);
         formData.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_REFRESH_TOKEN);
         formData.put(REDIRECT_URI_PARAMETER, externalCallbackUrl);
 
