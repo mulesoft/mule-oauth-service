@@ -154,12 +154,8 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     if (authorization != null) {
       requestBuilder.addHeader(AUTHORIZATION, authorization);
     } else if (QUERY_PARAMS.equals(clientCredentialsLocation)) {
-      try {
-        requestBuilder.addQueryParam(CLIENT_ID_PARAMETER, encode(clientId, encoding.name()));
-        requestBuilder.addQueryParam(CLIENT_SECRET_PARAMETER, encode(clientSecret, encoding.name()));
-      } catch (UnsupportedEncodingException e) {
-        throw new MuleRuntimeException(e);
-      }
+      requestBuilder.addQueryParam(CLIENT_ID_PARAMETER, clientId);
+      requestBuilder.addQueryParam(CLIENT_SECRET_PARAMETER, clientSecret);
     }
 
     return httpClient.sendAsync(requestBuilder.build(), HttpRequestOptions.builder()
