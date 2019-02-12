@@ -85,8 +85,8 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
 
     assertThat(requestCaptor.getValue().getHeaderValue(AUTHORIZATION), is("Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=="));
 
-    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_id"))));
-    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_secret"))));
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey("client_id")));
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey("client_secret")));
 
     String requestBody = IOUtils.toString(requestCaptor.getValue().getEntity().getContent(), UTF_8);
     assertThat(requestBody, containsString("code=authCode"));
@@ -122,8 +122,8 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
 
     assertThat(requestCaptor.getValue().getHeaderNames(), not(hasItem(equalToIgnoringCase(AUTHORIZATION))));
 
-    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_id"))));
-    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_secret"))));
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey("client_id")));
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey("client_secret")));
 
     String requestBody = IOUtils.toString(requestCaptor.getValue().getEntity().getContent(), UTF_8);
     assertThat(requestBody, containsString("grant_type=authorization_code"));
@@ -153,8 +153,8 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
 
     assertThat(requestCaptor.getValue().getHeaderNames(), not(hasItem(equalToIgnoringCase(AUTHORIZATION))));
 
-    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_id"))));
-    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_secret"))));
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey("client_id")));
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey("client_secret")));
 
     String requestBody = IOUtils.toString(requestCaptor.getValue().getEntity().getContent(), UTF_8);
     assertThat(requestBody, containsString("grant_type=authorization_code"));
@@ -203,8 +203,8 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
 
     assertThat(requestCaptor.getValue().getHeaderValue(AUTHORIZATION), is("Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=="));
 
-    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_id"))));
-    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_secret"))));
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey("client_id")));
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey("client_secret")));
 
     String requestBody = IOUtils.toString(requestCaptor.getValue().getEntity().getContent(), UTF_8);
     assertThat(requestBody, containsString("grant_type=refresh_token"));
@@ -237,8 +237,8 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
 
     assertThat(requestCaptor.getValue().getHeaderNames(), not(hasItem(equalToIgnoringCase(AUTHORIZATION))));
 
-    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_id"))));
-    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_secret"))));
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey("client_id")));
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey("client_secret")));
 
     String requestBody = IOUtils.toString(requestCaptor.getValue().getEntity().getContent(), UTF_8);
     assertThat(requestBody, containsString("grant_type=refresh_token"));
@@ -266,8 +266,8 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
 
     assertThat(requestCaptor.getValue().getHeaderNames(), not(hasItem(equalToIgnoringCase(AUTHORIZATION))));
 
-    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_id"))));
-    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey(eq("client_secret"))));
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey("client_id")));
+    assertThat(requestCaptor.getValue().getQueryParams(), not(hasKey("client_secret")));
 
     String requestBody = IOUtils.toString(requestCaptor.getValue().getEntity().getContent(), UTF_8);
     assertThat(requestBody, containsString("grant_type=refresh_token"));
