@@ -8,6 +8,7 @@ package org.mule.service.oauth.internal;
 
 import static java.lang.Thread.currentThread;
 import static java.util.concurrent.CompletableFuture.completedFuture;
+import static org.mule.runtime.api.util.MultiMap.emptyMultiMap;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_CLIENT_CREDENTIALS;
@@ -139,7 +140,7 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
     }
     String authorization = handleClientCredentials(formData);
 
-    return invokeTokenUrl(tokenUrl, formData, authorization, false, encoding).thenAccept(tokenResponse -> {
+    return invokeTokenUrl(tokenUrl, formData, emptyMultiMap(), authorization, false, encoding).thenAccept(tokenResponse -> {
       withContextClassLoader(DefaultClientCredentialsOAuthDancer.class.getClassLoader(), () -> {
         if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Retrieved access token, refresh token and expires from token url are: %s, %s, %s",

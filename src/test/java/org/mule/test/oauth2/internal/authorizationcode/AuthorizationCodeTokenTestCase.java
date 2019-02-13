@@ -286,6 +286,31 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
   }
 
   @Test
+  public void authCodeRefreshTokenWithQueryParams() throws Exception {
+    final OAuthAuthorizationCodeDancerBuilder builder = baseAuthCodeDancerbuilder();
+    builder.tokenUrl("http://host/token");
+    builder.authorizationUrl("http://host/auth");
+    builder.clientCredentials("Aladdin", "openSesame");
+
+    AuthorizationCodeOAuthDancer minimalDancer = startDancer(builder);
+    minimalDancer.refreshToken(null, true);
+
+    ArgumentCaptor<HttpRequest> requestCaptor = forClass(HttpRequest.class);
+    verify(httpClient).sendAsync(requestCaptor.capture(), any(HttpRequestOptions.class));
+
+    assertThat(requestCaptor.getValue().getQueryParams().get("client_id"), is("Aladdin"));
+    assertThat(requestCaptor.getValue().getQueryParams().get("client_secret"), is("openSesame"));
+    assertThat(requestCaptor.getValue().getQueryParams().get("grant_type"), is("refresh_token"));
+    assertThat(requestCaptor.getValue().getQueryParams().get("refresh_token"), is("refreshToken"));
+
+    String requestBody = IOUtils.toString(requestCaptor.getValue().getEntity().getContent(), UTF_8);
+    assertThat(requestBody, not(containsString("grant_type=refresh_token")));
+    assertThat(requestBody, not(containsString("refresh_token=")));
+    assertThat(requestBody, not(containsString("client_secret=openSesame")));
+    assertThat(requestBody, not(containsString("client_id=Aladdin")));
+  }
+
+  @Test
   public void authCodeCredentialsAsQueryParams() throws Exception {
     final OAuthAuthorizationCodeDancerBuilder builder = baseAuthCodeDancerbuilder();
     builder.tokenUrl("http://host/token");

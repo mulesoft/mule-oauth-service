@@ -139,13 +139,15 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
 
   protected CompletableFuture<TokenResponse> invokeTokenUrl(String tokenUrl,
                                                             Map<String, String> tokenRequestFormToSend,
+                                                            MultiMap<String, String> queryParams,
                                                             String authorization,
                                                             boolean retrieveRefreshToken,
                                                             Charset encoding) {
     final HttpRequestBuilder requestBuilder = HttpRequest.builder()
         .uri(tokenUrl).method(POST.name())
         .entity(new ByteArrayHttpEntity(encodeString(tokenRequestFormToSend, encoding).getBytes()))
-        .addHeader(CONTENT_TYPE, APPLICATION_X_WWW_FORM_URLENCODED.toRfcString());
+        .addHeader(CONTENT_TYPE, APPLICATION_X_WWW_FORM_URLENCODED.toRfcString())
+        .queryParams(queryParams);
 
     if (authorization != null) {
       requestBuilder.addHeader(AUTHORIZATION, authorization);

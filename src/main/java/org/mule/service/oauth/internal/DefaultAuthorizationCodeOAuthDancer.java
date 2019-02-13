@@ -9,11 +9,13 @@ package org.mule.service.oauth.internal;
 import static java.lang.String.format;
 import static java.lang.String.valueOf;
 import static java.lang.Thread.currentThread;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.singleton;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
 import static org.mule.runtime.api.metadata.MediaType.ANY;
 import static org.mule.runtime.api.metadata.MediaType.parse;
+import static org.mule.runtime.api.util.MultiMap.emptyMultiMap;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.runtime.core.api.util.StringUtils.isBlank;
 import static org.mule.runtime.http.api.HttpConstants.HttpStatus.BAD_REQUEST;
@@ -254,7 +256,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
         formData.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_AUTHENTICATION_CODE);
         formData.put(REDIRECT_URI_PARAMETER, externalCallbackUrl);
 
-        invokeTokenUrl(tokenUrl, formData, authorization, true, encoding)
+        invokeTokenUrl(tokenUrl, formData, emptyMultiMap(), authorization, true, encoding)
             .exceptionally(e -> {
               withContextClassLoader(DefaultAuthorizationCodeOAuthDancer.class.getClassLoader(), () -> {
                 if (e.getCause() instanceof TokenUrlResponseException) {
@@ -484,6 +486,11 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
 
   @Override
   public CompletableFuture<Void> refreshToken(String resourceOwner) {
+    return refreshToken(resourceOwner, false);
+  }
+
+  @Override
+  public CompletableFuture<Void> refreshToken(String resourceOwner, boolean useQueryParameters) {
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Executing refresh token for user " + resourceOwner);
     }
@@ -506,14 +513,25 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
                                                              resourceOwnerOAuthContext.getResourceOwnerId()));
         }
 
-        final Map<String, String> formData = new HashMap<>();
-        formData.put(REFRESH_TOKEN_PARAMETER, userRefreshToken);
-        String authorization = handleClientCredentials(formData);
-        formData.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_REFRESH_TOKEN);
-        formData.put(REDIRECT_URI_PARAMETER, externalCallbackUrl);
+        final MultiMap<String, String> requestParameters = new MultiMap<>();
+        requestParameters.put(REFRESH_TOKEN_PARAMETER, userRefreshToken);
+        String authorization = handleClientCredentials(requestParameters);
+        requestParameters.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_REFRESH_TOKEN);
+        requestParameters.put(REDIRECT_URI_PARAMETER, externalCallbackUrl);
+
+        MultiMap<String, String> queryParams;
+        Map<String, String> formData;
+
+        if (useQueryParameters) {
+          queryParams = requestParameters;
+          formData = emptyMap();
+        } else {
+          queryParams = emptyMultiMap();
+          formData = requestParameters;
+        }
 
         CompletableFuture<Void> refreshFuture =
-            invokeTokenUrl(tokenUrl, formData, authorization, true, encoding).thenAccept(tokenResponse -> {
+            invokeTokenUrl(tokenUrl, formData, queryParams, authorization, true, encoding).thenAccept(tokenResponse -> {
               lock.lock();
               try {
                 withContextClassLoader(DefaultAuthorizationCodeOAuthDancer.class.getClassLoader(), () -> {
