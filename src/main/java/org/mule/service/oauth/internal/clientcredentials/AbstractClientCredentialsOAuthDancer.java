@@ -4,7 +4,7 @@
  * license, a copy of which has been included with this distribution in the
  * LICENSE.txt file.
  */
-package org.mule.service.oauth.internal;
+package org.mule.service.oauth.internal.clientcredentials;
 
 import static java.lang.String.format;
 import static java.util.Collections.singletonMap;
@@ -63,7 +63,7 @@ import java.util.function.Function;
  *
  * @since 1.0
  */
-public abstract class AbstractOAuthDancer implements Startable, Stoppable {
+public abstract class AbstractClientCredentialsOAuthDancer implements Startable, Stoppable {
 
   private static final int TOKEN_REQUEST_TIMEOUT_MILLIS = 60000;
 
@@ -85,13 +85,13 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   private final HttpClient httpClient;
   private final MuleExpressionLanguage expressionEvaluator;
 
-  protected AbstractOAuthDancer(String clientId, String clientSecret, String tokenUrl, Charset encoding, String scopes,
-                                ClientCredentialsLocation clientCredentialsLocation, String responseAccessTokenExpr,
-                                String responseRefreshTokenExpr, String responseExpiresInExpr,
-                                Map<String, String> customParametersExtractorsExprs,
-                                Function<String, String> resourceOwnerIdTransformer, LockFactory lockProvider,
-                                Map<String, DefaultResourceOwnerOAuthContext> tokensStore, HttpClient httpClient,
-                                MuleExpressionLanguage expressionEvaluator) {
+  protected AbstractClientCredentialsOAuthDancer(String clientId, String clientSecret, String tokenUrl, Charset encoding, String scopes,
+                                                 ClientCredentialsLocation clientCredentialsLocation, String responseAccessTokenExpr,
+                                                 String responseRefreshTokenExpr, String responseExpiresInExpr,
+                                                 Map<String, String> customParametersExtractorsExprs,
+                                                 Function<String, String> resourceOwnerIdTransformer, LockFactory lockProvider,
+                                                 Map<String, DefaultResourceOwnerOAuthContext> tokensStore, HttpClient httpClient,
+                                                 MuleExpressionLanguage expressionEvaluator) {
     this.clientId = clientId;
     this.clientSecret = clientSecret;
     this.tokenUrl = tokenUrl;
@@ -160,7 +160,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
         .responseTimeout(TOKEN_REQUEST_TIMEOUT_MILLIS)
         .build())
         .exceptionally(t -> {
-          return withContextClassLoader(AbstractOAuthDancer.class.getClassLoader(), () -> {
+          return withContextClassLoader(AbstractClientCredentialsOAuthDancer.class.getClassLoader(), () -> {
             if (t instanceof IOException) {
               throw new CompletionException(new TokenUrlResponseException(tokenUrl, (IOException) t));
             } else {
@@ -169,7 +169,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
           });
         })
         .thenApply(response -> {
-          return withContextClassLoader(AbstractOAuthDancer.class.getClassLoader(), () -> {
+          return withContextClassLoader(AbstractClientCredentialsOAuthDancer.class.getClassLoader(), () -> {
             String contentType = response.getHeaderValue(CONTENT_TYPE);
             MediaType responseContentType = contentType != null ? parse(contentType) : ANY;
 

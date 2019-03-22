@@ -4,7 +4,7 @@
  * license, a copy of which has been included with this distribution in the
  * LICENSE.txt file.
  */
-package org.mule.service.oauth.internal;
+package org.mule.service.oauth.internal.clientcredentials;
 
 import static java.lang.Thread.currentThread;
 import static java.util.concurrent.CompletableFuture.completedFuture;
@@ -47,7 +47,7 @@ import java.util.function.Function;
  *
  * @since 1.0
  */
-public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer implements Startable, ClientCredentialsOAuthDancer {
+public class DefaultClientCredentialsOAuthDancer extends AbstractClientCredentialsOAuthDancer implements Startable, ClientCredentialsOAuthDancer {
 
   private static final Logger LOGGER = getLogger(DefaultClientCredentialsOAuthDancer.class);
 

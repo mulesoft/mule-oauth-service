@@ -15,7 +15,7 @@ import org.mule.runtime.http.api.HttpService;
 import org.mule.runtime.oauth.api.ClientCredentialsOAuthDancer;
 import org.mule.runtime.oauth.api.builder.OAuthClientCredentialsDancerBuilder;
 import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
-import org.mule.service.oauth.internal.DefaultClientCredentialsOAuthDancer;
+import org.mule.service.oauth.internal.clientcredentials.DefaultClientCredentialsOAuthDancer;
 
 import java.util.Map;
 

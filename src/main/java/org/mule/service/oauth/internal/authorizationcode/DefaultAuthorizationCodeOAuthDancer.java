@@ -4,50 +4,13 @@
  * license, a copy of which has been included with this distribution in the
  * LICENSE.txt file.
  */
-package org.mule.service.oauth.internal;
+package org.mule.service.oauth.internal.authorizationcode;
 
-import static java.lang.String.format;
-import static java.lang.String.valueOf;
-import static java.lang.Thread.currentThread;
-import static java.util.Collections.emptyMap;
-import static java.util.Collections.singleton;
-import static java.util.concurrent.CompletableFuture.completedFuture;
-import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
-import static org.mule.runtime.api.metadata.MediaType.ANY;
-import static org.mule.runtime.api.metadata.MediaType.parse;
-import static org.mule.runtime.api.util.MultiMap.emptyMultiMap;
-import static org.mule.runtime.api.util.Preconditions.checkArgument;
-import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
-import static org.mule.runtime.core.api.util.StringUtils.isBlank;
-import static org.mule.runtime.http.api.HttpConstants.HttpStatus.BAD_REQUEST;
-import static org.mule.runtime.http.api.HttpConstants.HttpStatus.INTERNAL_SERVER_ERROR;
-import static org.mule.runtime.http.api.HttpConstants.HttpStatus.MOVED_TEMPORARILY;
-import static org.mule.runtime.http.api.HttpConstants.HttpStatus.OK;
-import static org.mule.runtime.http.api.HttpConstants.Method.GET;
-import static org.mule.runtime.http.api.HttpHeaders.Names.CONTENT_LENGTH;
-import static org.mule.runtime.http.api.HttpHeaders.Names.CONTENT_TYPE;
-import static org.mule.runtime.http.api.HttpHeaders.Names.LOCATION;
-import static org.mule.runtime.http.api.utils.HttpEncoderDecoderUtils.appendQueryParam;
-import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.AUTHORIZATION_CODE_RECEIVED_STATUS;
-import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.AUTHORIZATION_STATUS_QUERY_PARAM_KEY;
-import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.NO_AUTHORIZATION_CODE_STATUS;
-import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.TOKEN_NOT_FOUND_STATUS;
-import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.TOKEN_URL_CALL_FAILED_STATUS;
-import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
-import static org.mule.service.oauth.internal.OAuthConstants.CODE_PARAMETER;
-import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_AUTHENTICATION_CODE;
-import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_PARAMETER;
-import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_REFRESH_TOKEN;
-import static org.mule.service.oauth.internal.OAuthConstants.REDIRECT_URI_PARAMETER;
-import static org.mule.service.oauth.internal.OAuthConstants.REFRESH_TOKEN_PARAMETER;
-import static org.mule.service.oauth.internal.OAuthConstants.STATE_PARAMETER;
-import static org.slf4j.LoggerFactory.getLogger;
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.DefaultMuleException;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.lifecycle.InitialisationException;
-import org.mule.runtime.api.lifecycle.Lifecycle;
 import org.mule.runtime.api.lock.LockFactory;
 import org.mule.runtime.api.metadata.MediaType;
 import org.mule.runtime.api.util.MultiMap;
@@ -68,7 +31,6 @@ import org.mule.runtime.http.api.server.RequestHandler;
 import org.mule.runtime.http.api.server.RequestHandlerManager;
 import org.mule.runtime.http.api.server.async.HttpResponseReadyCallback;
 import org.mule.runtime.http.api.server.async.ResponseStatusCallback;
-import org.mule.runtime.oauth.api.AuthorizationCodeOAuthDancer;
 import org.mule.runtime.oauth.api.AuthorizationCodeRequest;
 import org.mule.runtime.oauth.api.builder.AuthorizationCodeDanceCallbackContext;
 import org.mule.runtime.oauth.api.builder.AuthorizationCodeListener;
@@ -78,11 +40,9 @@ import org.mule.runtime.oauth.api.exception.TokenNotFoundException;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
 import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
-import org.mule.service.oauth.internal.authorizationcode.AuthorizationRequestUrlBuilder;
-import org.mule.service.oauth.internal.authorizationcode.DefaultAuthorizationCodeRequest;
 import org.mule.service.oauth.internal.state.StateDecoder;
 import org.mule.service.oauth.internal.state.StateEncoder;
-import org.mule.service.oauth.internal.state.TokenResponse;
+import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -92,20 +52,37 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import org.slf4j.Logger;
+import static java.lang.String.format;
+import static java.lang.String.valueOf;
+import static java.lang.Thread.currentThread;
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.singleton;
+import static java.util.concurrent.CompletableFuture.completedFuture;
+import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
+import static org.mule.runtime.api.metadata.MediaType.ANY;
+import static org.mule.runtime.api.metadata.MediaType.parse;
+import static org.mule.runtime.api.util.MultiMap.emptyMultiMap;
+import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
+import static org.mule.runtime.http.api.HttpConstants.HttpStatus.*;
+import static org.mule.runtime.http.api.HttpConstants.Method.GET;
+import static org.mule.runtime.http.api.HttpHeaders.Names.*;
+import static org.mule.runtime.http.api.utils.HttpEncoderDecoderUtils.appendQueryParam;
+import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.*;
+import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
+import static org.mule.service.oauth.internal.OAuthConstants.*;
+import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * Provides OAuth dance support for authorization-code grant-type.
  *
  * @since 1.0
  */
-public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer implements AuthorizationCodeOAuthDancer, Lifecycle {
+public class DefaultAuthorizationCodeOAuthDancer extends AbstractAuthorizationCodeOAuthDancer {
 
   private static final Logger LOGGER = getLogger(DefaultAuthorizationCodeOAuthDancer.class);
 
@@ -124,10 +101,11 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
 
   private final Function<AuthorizationCodeRequest, AuthorizationCodeDanceCallbackContext> beforeDanceCallback;
   private final BiConsumer<AuthorizationCodeDanceCallbackContext, ResourceOwnerOAuthContext> afterDanceCallback;
-  private final List<AuthorizationCodeListener> listeners;
 
   private RequestHandlerManager redirectUrlHandlerManager;
   private RequestHandlerManager localAuthorizationUrlHandlerManager;
+
+  private static final Map<String, CompletableFuture<Void>> activeRefreshFutures = new ConcurrentHashMap<>();
 
   public DefaultAuthorizationCodeOAuthDancer(Optional<HttpServer> httpServer, String clientId, String clientSecret,
                                              String tokenUrl, String scopes, ClientCredentialsLocation clientCredentialsLocation,
@@ -146,7 +124,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
     super(clientId, clientSecret, tokenUrl, encoding, scopes, clientCredentialsLocation, responseAccessTokenExpr,
           responseRefreshTokenExpr,
           responseExpiresInExpr, customParametersExtractorsExprs, resourceOwnerIdTransformer, lockProvider, tokensStore,
-          httpClient, expressionEvaluator);
+          httpClient, expressionEvaluator, listeners);
 
     this.httpServer = httpServer;
     this.localCallbackUrlPath = localCallbackUrlPath;
@@ -159,12 +137,6 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
 
     this.beforeDanceCallback = beforeDanceCallback;
     this.afterDanceCallback = afterDanceCallback;
-
-    if (listeners != null) {
-      this.listeners = new CopyOnWriteArrayList<>(listeners);
-    } else {
-      this.listeners = new CopyOnWriteArrayList<>();
-    }
   }
 
   @Override
@@ -177,15 +149,160 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
   }
 
   @Override
-  public void addListener(AuthorizationCodeListener listener) {
-    checkArgument(listener != null, "Cannot add a null listener");
-    listeners.add(listener);
+  public void start() throws MuleException {
+    super.start();
+    if (httpServer.isPresent()) {
+      try {
+        httpServer.get().start();
+      } catch (IOException e) {
+        throw new DefaultMuleException(e);
+      }
+      redirectUrlHandlerManager.start();
+      localAuthorizationUrlHandlerManager.start();
+    }
   }
 
   @Override
-  public void removeListener(AuthorizationCodeListener listener) {
-    checkArgument(listener != null, "Cannot remove a null listener");
-    listeners.remove(listener);
+  public void stop() throws MuleException {
+    if (httpServer.isPresent()) {
+      redirectUrlHandlerManager.stop();
+      localAuthorizationUrlHandlerManager.stop();
+      httpServer.get().stop();
+    }
+    super.stop();
+  }
+
+  @Override
+  public void dispose() {
+    if (httpServer.isPresent()) {
+      redirectUrlHandlerManager.dispose();
+      localAuthorizationUrlHandlerManager.dispose();
+      httpServer.get().dispose();
+    }
+  }
+
+  @Override
+  public CompletableFuture<String> accessToken(String resourceOwner) throws RequestAuthenticationException {
+    final String accessToken = getContextForResourceOwner(resourceOwner).getAccessToken();
+    if (accessToken == null) {
+      throw new RequestAuthenticationException(createStaticMessage(format("No access token found. "
+              + "Verify that you have authenticated before trying to execute an operation to the API.")));
+    }
+
+    // TODO MULE-11858 proactively refresh if the token has already expired based on its 'expiresIn' parameter
+    return completedFuture(accessToken);
+  }
+
+  @Override
+  public CompletableFuture<Void> refreshToken(String resourceOwner) {
+    return refreshToken(resourceOwner, false);
+  }
+
+  @Override
+  public CompletableFuture<Void> refreshToken(String resourceOwner, boolean useQueryParameters) {
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Executing refresh token for user " + resourceOwner);
+    }
+    final DefaultResourceOwnerOAuthContext resourceOwnerOAuthContext =
+            (DefaultResourceOwnerOAuthContext) getContextForResourceOwner(resourceOwner);
+
+    String nullSafeResourceOwner = "" + resourceOwner;
+    CompletableFuture<Void> activeRefreshFuture = activeRefreshFutures.get(nullSafeResourceOwner);
+    if (activeRefreshFuture != null) {
+      return activeRefreshFuture;
+    }
+
+    Lock lock = resourceOwnerOAuthContext.getRefreshUserOAuthContextLock();
+    final boolean lockWasAcquired = lock.tryLock();
+    if (lockWasAcquired) {
+      try {
+        final String userRefreshToken = resourceOwnerOAuthContext.getRefreshToken();
+        if (userRefreshToken == null) {
+          throw new MuleRuntimeException(createStaticMessage("The user with user id %s has no refresh token in his OAuth state so we can't execute the refresh token call",
+                  resourceOwnerOAuthContext.getResourceOwnerId()));
+        }
+
+        final MultiMap<String, String> requestParameters = new MultiMap<>();
+        requestParameters.put(REFRESH_TOKEN_PARAMETER, userRefreshToken);
+        String authorization = handleClientCredentials(requestParameters);
+        requestParameters.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_REFRESH_TOKEN);
+        requestParameters.put(REDIRECT_URI_PARAMETER, externalCallbackUrl);
+
+        MultiMap<String, String> queryParams;
+        Map<String, String> formData;
+
+        if (useQueryParameters) {
+          queryParams = requestParameters;
+          formData = emptyMap();
+        } else {
+          queryParams = emptyMultiMap();
+          formData = requestParameters;
+        }
+
+        CompletableFuture<Void> refreshFuture =
+                invokeTokenUrl(tokenUrl, formData, queryParams, authorization, true, encoding).thenAccept(tokenResponse -> {
+                  lock.lock();
+                  try {
+                    withContextClassLoader(DefaultAuthorizationCodeOAuthDancer.class.getClassLoader(), () -> {
+                      if (LOGGER.isDebugEnabled()) {
+                        LOGGER.debug("Update OAuth Context for resourceOwnerId %s", resourceOwnerOAuthContext.getResourceOwnerId());
+                      }
+                      updateResourceOwnerState(resourceOwnerOAuthContext, null, tokenResponse);
+                      updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
+                      listeners.forEach(l -> l.onTokenRefreshed(resourceOwnerOAuthContext));
+                    });
+                  } finally {
+                    lock.unlock();
+                  }
+                });
+        activeRefreshFutures.put(nullSafeResourceOwner, refreshFuture);
+        refreshFuture.thenRun(() -> activeRefreshFutures.remove(nullSafeResourceOwner, refreshFuture));
+        return refreshFuture;
+      } finally {
+        lock.unlock();
+      }
+    } else {
+      lock.lock();
+      try {
+        return activeRefreshFutures.get(nullSafeResourceOwner);
+      } finally {
+        lock.unlock();
+      }
+    }
+  }
+
+  public void handleLocalAuthorizationRequest(HttpRequest request, HttpResponseReadyCallback responseCallback) {
+    final String body = readBody(request);
+    final MultiMap<String, String> headers = readHeaders(request);
+    final MediaType mediaType = getMediaType(request);
+    final MultiMap<String, String> queryParams = request.getQueryParams();
+
+    final String originalState = resolveExpression(state, body, headers, queryParams, mediaType);
+    final StateEncoder stateEncoder = new StateEncoder(originalState);
+
+    final String resourceOwnerId =
+            resolveExpression(localAuthorizationUrlResourceOwnerId, body, headers, queryParams, mediaType);
+    if (resourceOwnerId != null) {
+      stateEncoder.encodeResourceOwnerIdInState(resourceOwnerId);
+    }
+
+    final String onCompleteRedirectToValue = queryParams.get("onCompleteRedirectTo");
+    if (onCompleteRedirectToValue != null) {
+      stateEncoder.encodeOnCompleteRedirectToInState(onCompleteRedirectToValue);
+    }
+
+    final String authorizationUrlWithParams = new AuthorizationRequestUrlBuilder()
+            .setAuthorizationUrl(authorizationUrl)
+            .setClientId(clientId)
+            .setClientSecret(clientSecret)
+            .setCustomParameters(customParameters.get())
+            .setRedirectUrl(externalCallbackUrl)
+            .setState(stateEncoder.getEncodedState())
+            .setScope(scopes)
+            .setEncoding(encoding)
+            .buildUrl();
+
+    sendResponse(responseCallback, MOVED_TEMPORARILY, body, authorizationUrlWithParams);
   }
 
   private static RequestHandlerManager addRequestHandler(HttpServer server, Method method, String path,
@@ -413,41 +530,6 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
     };
   }
 
-  @Override
-  public void handleLocalAuthorizationRequest(HttpRequest request, HttpResponseReadyCallback responseCallback) {
-    final String body = readBody(request);
-    final MultiMap<String, String> headers = readHeaders(request);
-    final MediaType mediaType = getMediaType(request);
-    final MultiMap<String, String> queryParams = request.getQueryParams();
-
-    final String originalState = resolveExpression(state, body, headers, queryParams, mediaType);
-    final StateEncoder stateEncoder = new StateEncoder(originalState);
-
-    final String resourceOwnerId =
-        resolveExpression(localAuthorizationUrlResourceOwnerId, body, headers, queryParams, mediaType);
-    if (resourceOwnerId != null) {
-      stateEncoder.encodeResourceOwnerIdInState(resourceOwnerId);
-    }
-
-    final String onCompleteRedirectToValue = queryParams.get("onCompleteRedirectTo");
-    if (onCompleteRedirectToValue != null) {
-      stateEncoder.encodeOnCompleteRedirectToInState(onCompleteRedirectToValue);
-    }
-
-    final String authorizationUrlWithParams = new AuthorizationRequestUrlBuilder()
-        .setAuthorizationUrl(authorizationUrl)
-        .setClientId(clientId)
-        .setClientSecret(clientSecret)
-        .setCustomParameters(customParameters.get())
-        .setRedirectUrl(externalCallbackUrl)
-        .setState(stateEncoder.getEncodedState())
-        .setScope(scopes)
-        .setEncoding(encoding)
-        .buildUrl();
-
-    sendResponse(responseCallback, MOVED_TEMPORARILY, body, authorizationUrlWithParams);
-  }
-
   private String readBody(final HttpRequest request) {
     return IOUtils.toString(request.getEntity().getContent());
   }
@@ -460,160 +542,4 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
     String contentType = request.getHeaderValue(CONTENT_TYPE);
     return contentType != null ? parse(contentType) : ANY;
   }
-
-  @Override
-  public void start() throws MuleException {
-    super.start();
-    if (httpServer.isPresent()) {
-      try {
-        httpServer.get().start();
-      } catch (IOException e) {
-        throw new DefaultMuleException(e);
-      }
-      redirectUrlHandlerManager.start();
-      localAuthorizationUrlHandlerManager.start();
-    }
-  }
-
-  @Override
-  public void stop() throws MuleException {
-    if (httpServer.isPresent()) {
-      redirectUrlHandlerManager.stop();
-      localAuthorizationUrlHandlerManager.stop();
-      httpServer.get().stop();
-    }
-    super.stop();
-  }
-
-  @Override
-  public void dispose() {
-    if (httpServer.isPresent()) {
-      redirectUrlHandlerManager.dispose();
-      localAuthorizationUrlHandlerManager.dispose();
-      httpServer.get().dispose();
-    }
-  }
-
-  @Override
-  public CompletableFuture<String> accessToken(String resourceOwner) throws RequestAuthenticationException {
-    final String accessToken = getContextForResourceOwner(resourceOwner).getAccessToken();
-    if (accessToken == null) {
-      throw new RequestAuthenticationException(createStaticMessage(format("No access token found. "
-          + "Verify that you have authenticated before trying to execute an operation to the API.")));
-    }
-
-    // TODO MULE-11858 proactively refresh if the token has already expired based on its 'expiresIn' parameter
-    return completedFuture(accessToken);
-  }
-
-  private static final Map<String, CompletableFuture<Void>> activeRefreshFutures = new ConcurrentHashMap<>();
-
-  @Override
-  public CompletableFuture<Void> refreshToken(String resourceOwner) {
-    return refreshToken(resourceOwner, false);
-  }
-
-  @Override
-  public CompletableFuture<Void> refreshToken(String resourceOwner, boolean useQueryParameters) {
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Executing refresh token for user " + resourceOwner);
-    }
-    final DefaultResourceOwnerOAuthContext resourceOwnerOAuthContext =
-        (DefaultResourceOwnerOAuthContext) getContextForResourceOwner(resourceOwner);
-
-    String nullSafeResourceOwner = "" + resourceOwner;
-    CompletableFuture<Void> activeRefreshFuture = activeRefreshFutures.get(nullSafeResourceOwner);
-    if (activeRefreshFuture != null) {
-      return activeRefreshFuture;
-    }
-
-    Lock lock = resourceOwnerOAuthContext.getRefreshUserOAuthContextLock();
-    final boolean lockWasAcquired = lock.tryLock();
-    if (lockWasAcquired) {
-      try {
-        final String userRefreshToken = resourceOwnerOAuthContext.getRefreshToken();
-        if (userRefreshToken == null) {
-          throw new MuleRuntimeException(createStaticMessage("The user with user id %s has no refresh token in his OAuth state so we can't execute the refresh token call",
-                                                             resourceOwnerOAuthContext.getResourceOwnerId()));
-        }
-
-        final MultiMap<String, String> requestParameters = new MultiMap<>();
-        requestParameters.put(REFRESH_TOKEN_PARAMETER, userRefreshToken);
-        String authorization = handleClientCredentials(requestParameters);
-        requestParameters.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_REFRESH_TOKEN);
-        requestParameters.put(REDIRECT_URI_PARAMETER, externalCallbackUrl);
-
-        MultiMap<String, String> queryParams;
-        Map<String, String> formData;
-
-        if (useQueryParameters) {
-          queryParams = requestParameters;
-          formData = emptyMap();
-        } else {
-          queryParams = emptyMultiMap();
-          formData = requestParameters;
-        }
-
-        CompletableFuture<Void> refreshFuture =
-            invokeTokenUrl(tokenUrl, formData, queryParams, authorization, true, encoding).thenAccept(tokenResponse -> {
-              lock.lock();
-              try {
-                withContextClassLoader(DefaultAuthorizationCodeOAuthDancer.class.getClassLoader(), () -> {
-                  if (LOGGER.isDebugEnabled()) {
-                    LOGGER.debug("Update OAuth Context for resourceOwnerId %s", resourceOwnerOAuthContext.getResourceOwnerId());
-                  }
-                  updateResourceOwnerState(resourceOwnerOAuthContext, null, tokenResponse);
-                  updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
-                  listeners.forEach(l -> l.onTokenRefreshed(resourceOwnerOAuthContext));
-                });
-              } finally {
-                lock.unlock();
-              }
-            });
-        activeRefreshFutures.put(nullSafeResourceOwner, refreshFuture);
-        refreshFuture.thenRun(() -> activeRefreshFutures.remove(nullSafeResourceOwner, refreshFuture));
-        return refreshFuture;
-      } finally {
-        lock.unlock();
-      }
-    } else {
-      lock.lock();
-      try {
-        return activeRefreshFutures.get(nullSafeResourceOwner);
-      } finally {
-        lock.unlock();
-      }
-    }
-  }
-
-  private void updateResourceOwnerState(DefaultResourceOwnerOAuthContext resourceOwnerOAuthContext, String newState,
-                                        TokenResponse tokenResponse) {
-    resourceOwnerOAuthContext.setAccessToken(tokenResponse.getAccessToken());
-    if (tokenResponse.getRefreshToken() != null) {
-      resourceOwnerOAuthContext.setRefreshToken(tokenResponse.getRefreshToken());
-    }
-    resourceOwnerOAuthContext.setExpiresIn(tokenResponse.getExpiresIn());
-
-    // State may be null because there's no state or because this was called after refresh token.
-    if (newState != null) {
-      resourceOwnerOAuthContext.setState(newState);
-    }
-
-    final Map<String, Object> customResponseParameters = tokenResponse.getCustomResponseParameters();
-    for (String paramName : customResponseParameters.keySet()) {
-      final Object paramValue = customResponseParameters.get(paramName);
-      if (paramValue != null) {
-        resourceOwnerOAuthContext.getTokenResponseParameters().put(paramName, paramValue);
-      }
-    }
-
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("New OAuth State for resourceOwnerId %s is: accessToken(%s), refreshToken(%s), expiresIn(%s), state(%s)",
-                   resourceOwnerOAuthContext.getResourceOwnerId(), resourceOwnerOAuthContext.getAccessToken(),
-                   isBlank(resourceOwnerOAuthContext.getRefreshToken()) ? "Not issued"
-                       : resourceOwnerOAuthContext.getRefreshToken(),
-                   resourceOwnerOAuthContext.getExpiresIn(), resourceOwnerOAuthContext.getState());
-    }
-  }
-
 }

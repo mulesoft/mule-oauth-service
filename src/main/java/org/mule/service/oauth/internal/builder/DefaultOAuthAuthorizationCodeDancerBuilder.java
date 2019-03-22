@@ -29,7 +29,6 @@ import org.mule.runtime.oauth.api.builder.AuthorizationCodeListener;
 import org.mule.runtime.oauth.api.builder.OAuthAuthorizationCodeDancerBuilder;
 import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
-import org.mule.service.oauth.internal.DefaultAuthorizationCodeOAuthDancer;
 
 import java.net.URL;
 import java.util.LinkedList;
@@ -185,11 +184,10 @@ public class DefaultOAuthAuthorizationCodeDancerBuilder extends AbstractOAuthDan
     checkArgument(isNotBlank(clientId), "clientId cannot be blank");
     checkArgument(isNotBlank(clientSecret), "clientSecret cannot be blank");
     checkArgument(isNotBlank(tokenUrl), "tokenUrl cannot be blank");
-    checkArgument(isNotBlank(authorizationUrl), "authorizationUrl cannot be blank");
 
     Optional<HttpServer> httpServer = localCallbackServerFactory != null ? of(localCallbackServerFactory.get()) : empty();
 
-    return new DefaultAuthorizationCodeOAuthDancer(httpServer, clientId, clientSecret,
+    return new AuthorizationCodeOAuthDancerDelegate(httpServer, clientId, clientSecret,
                                                    tokenUrl, scopes, clientCredentialsLocation, externalCallbackUrl, encoding,
                                                    localCallbackUrlPath, localAuthorizationUrlPath,
                                                    localAuthorizationUrlResourceOwnerId, state,
@@ -199,5 +197,4 @@ public class DefaultOAuthAuthorizationCodeDancerBuilder extends AbstractOAuthDan
                                                    httpClientFactory.get(), expressionEvaluator, beforeDanceCallback,
                                                    afterDanceCallback, listeners);
   }
-
 }
