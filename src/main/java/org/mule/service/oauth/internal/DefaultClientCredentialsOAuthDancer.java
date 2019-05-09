@@ -15,6 +15,7 @@ import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_CLIENT_C
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.SCOPE_PARAMETER;
 import static org.slf4j.LoggerFactory.getLogger;
+
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.lifecycle.LifecycleException;
@@ -55,8 +56,8 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
   private static final Logger LOGGER = getLogger(DefaultClientCredentialsOAuthDancer.class);
 
   private boolean accessTokenRefreshedOnStart = false;
-  private MultiMap<String, String> customParameters;
-  private MultiMap<String, String> customHeaders;
+  private final MultiMap<String, String> customParameters;
+  private final MultiMap<String, String> customHeaders;
   private final List<ClientCredentialsListener> listeners;
 
   public DefaultClientCredentialsOAuthDancer(String clientId, String clientSecret, String tokenUrl, String scopes,
@@ -87,8 +88,8 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
   @Override
   public void start() throws MuleException {
     super.start();
-    // We use a reentrant instead of one from the lock factory because the local state of this object cannot be shared in the
-    // cluster.
+    // TODO MULE-17013 We use a reentrant instead of one from the lock factory because the local state of this object cannot be
+    // shared in the cluster.
     // For this to work within a cluster we would need some notifications mechanism from the object store to know when a token
     // was refreshed in another node.
     refreshTokenLock = new ReentrantLock();
@@ -134,10 +135,26 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
   }
 
   private CompletableFuture<Void> doRefreshToken(boolean notifyListeners) {
-    if (refreshTokenLock.tryLock()) {
+    // TODO MULE-17013 make this work in cluster
+    final CompletableFuture<Void> activeRefreshFuture = lastRefreshTokenFuture;
+    if (activeRefreshFuture != null) {
+      return activeRefreshFuture;
+    }
+
+    final boolean lockWasAcquired = refreshTokenLock.tryLock();
+    if (lockWasAcquired) {
       try {
-        lastRefreshTokenFuture = doRefreshTokenRequest(notifyListeners);
-        return lastRefreshTokenFuture;
+        CompletableFuture<Void> refreshFuture = doRefreshTokenRequest(notifyListeners);
+        lastRefreshTokenFuture = refreshFuture;
+        refreshFuture.whenComplete((v, t) -> {
+          refreshTokenLock.lock();
+          try {
+            lastRefreshTokenFuture = null;
+          } finally {
+            refreshTokenLock.unlock();
+          }
+        });
+        return refreshFuture;
       } finally {
         refreshTokenLock.unlock();
       }
