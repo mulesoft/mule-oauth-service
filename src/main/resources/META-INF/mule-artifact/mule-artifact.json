@@ -1,6 +1,6 @@
 {
   "name": "OAUTH service",
-  "minMuleVersion": "4.2.0",
+  "minMuleVersion": "4.2.1",
   "requiredProduct": "MULE",
   "contracts": [
     {
