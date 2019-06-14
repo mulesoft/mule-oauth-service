@@ -19,14 +19,15 @@ import static org.hamcrest.core.IsCollectionContaining.hasItem;
 import static org.hamcrest.text.IsEqualIgnoringCase.equalToIgnoringCase;
 import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentCaptor.forClass;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.argThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mule.runtime.http.api.HttpHeaders.Names.AUTHORIZATION;
 import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.BASIC_AUTH_HEADER;
 import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.BODY;
 import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.QUERY_PARAMS;
+
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.util.MultiMap;
 import org.mule.runtime.http.api.client.HttpRequestOptions;
@@ -50,7 +51,9 @@ import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
 
+import io.qameta.allure.Feature;
 
+@Feature("OAuth Service")
 public class ClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
 
   private static final String ALADDIN = "Aladdin";
@@ -101,12 +104,11 @@ public class ClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
     } finally {
       executor.shutdownNow();
     }
-
   }
 
   private static class HttpRequestUrlMatcher implements ArgumentMatcher<HttpRequest> {
 
-    private URI uri;
+    private final URI uri;
 
     public HttpRequestUrlMatcher(String url) throws URISyntaxException {
       this.uri = new URI("http://host/token");

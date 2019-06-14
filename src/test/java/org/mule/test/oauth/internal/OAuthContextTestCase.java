@@ -27,13 +27,13 @@ import org.mule.runtime.oauth.api.builder.OAuthClientCredentialsDancerBuilder;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
 import org.mule.test.oauth.AbstractOAuthTestCase;
 
-import org.junit.Before;
-import org.junit.Test;
-
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
+
+import org.junit.Before;
+import org.junit.Test;
 
 import io.qameta.allure.Feature;
 

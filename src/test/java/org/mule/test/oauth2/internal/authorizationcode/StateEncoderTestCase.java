@@ -16,6 +16,9 @@ import org.mule.tck.junit4.AbstractMuleTestCase;
 
 import org.junit.Test;
 
+import io.qameta.allure.Feature;
+
+@Feature("OAuth Service")
 public class StateEncoderTestCase extends AbstractMuleTestCase {
 
   public static final String ORIGINAL_STATE_VALUE = "original-state-value";

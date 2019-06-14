@@ -16,8 +16,8 @@ import static org.hamcrest.core.IsCollectionContaining.hasItem;
 import static org.hamcrest.text.IsEqualIgnoringCase.equalToIgnoringCase;
 import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentCaptor.forClass;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,19 +42,21 @@ import org.mule.runtime.oauth.api.builder.OAuthAuthorizationCodeDancerBuilder;
 import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 import org.mule.test.oauth.AbstractOAuthTestCase;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.locks.ReentrantLock;
+
 import org.apache.commons.io.IOUtils;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.locks.ReentrantLock;
+import io.qameta.allure.Feature;
 
-
+@Feature("OAuth Service")
 public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
 
-  private ArgumentCaptor<RequestHandler> localCallbackCaptor = forClass(RequestHandler.class);
+  private final ArgumentCaptor<RequestHandler> localCallbackCaptor = forClass(RequestHandler.class);
 
   @Before
   public void before() {

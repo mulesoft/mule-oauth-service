@@ -17,12 +17,12 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
-import org.junit.Ignore;
 import static org.junit.rules.ExpectedException.none;
 import static org.mockito.ArgumentCaptor.forClass;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -33,6 +33,7 @@ import static org.mule.runtime.http.api.HttpConstants.Method.GET;
 import static org.mule.service.oauth.internal.OAuthConstants.CODE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.STATE_PARAMETER;
 import static org.mule.service.oauth.internal.state.StateEncoder.RESOURCE_OWNER_PARAM_NAME_ASSIGN;
+import static org.mule.tck.probe.PollingProber.probe;
 
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.MuleException;
@@ -54,13 +55,6 @@ import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
 import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 import org.mule.test.oauth.AbstractOAuthTestCase;
 
-import org.apache.commons.io.input.ReaderInputStream;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.mockito.ArgumentCaptor;
-
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.MalformedURLException;
@@ -71,21 +65,29 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.commons.io.input.ReaderInputStream;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.mockito.ArgumentCaptor;
+
 import io.qameta.allure.Feature;
 
 @Feature("OAuth Service")
-@Ignore("MULE-15938: Ignoring this flaky tests that are adding no value in this state")
 public class DancerConfigTestCase extends AbstractOAuthTestCase {
 
   @Rule
   public ExpectedException expected = none();
 
-  private ArgumentCaptor<RequestHandler> requestHandlerCaptor = forClass(RequestHandler.class);
+  private final ArgumentCaptor<RequestHandler> requestHandlerCaptor = forClass(RequestHandler.class);
 
   @Before
   public void before() throws Exception {
     when(httpServer.addRequestHandler(anyString(), requestHandlerCaptor.capture())).thenReturn(mock(RequestHandlerManager.class));
     when(httpServer.addRequestHandler(any(), anyString(), requestHandlerCaptor.capture()))
+        .thenReturn(mock(RequestHandlerManager.class));
+    when(httpServer.addRequestHandler(any(), isNull(), requestHandlerCaptor.capture()))
         .thenReturn(mock(RequestHandlerManager.class));
   }
 
@@ -295,7 +297,7 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
 
     configureRequestHandler(resourceOwner, "");
 
-    assertThat(afterCallbackCalled.get(), is(true));
+    probe(() -> afterCallbackCalled.get());
   }
 
   @Test
@@ -320,7 +322,7 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
 
     configureRequestHandler(resourceOwner, originalState);
 
-    assertThat(afterCallbackCalled.get(), is(true));
+    probe(() -> afterCallbackCalled.get());
   }
 
   @Test
@@ -345,7 +347,7 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
 
     configureRequestHandler(resourceOwner, "");
 
-    assertThat(afterCallbackCalled.get(), is(true));
+    probe(() -> afterCallbackCalled.get());
   }
 
   @Test
@@ -370,7 +372,7 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
 
     configureRequestHandler(resourceOwner, "");
 
-    assertThat(afterCallbackCalled.get(), is(true));
+    probe(() -> afterCallbackCalled.get());
   }
 
   @Test
