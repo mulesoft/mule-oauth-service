@@ -6,17 +6,15 @@
  */
 package org.mule.service.oauth.internal.builder;
 
-import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.BASIC_AUTH_HEADER;
 import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.BODY;
+
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.lock.LockFactory;
 import org.mule.runtime.api.tls.TlsContextFactory;
-import org.mule.runtime.http.api.HttpService;
+import org.mule.runtime.api.util.Pair;
 import org.mule.runtime.http.api.client.HttpClient;
-import org.mule.runtime.http.api.client.HttpClientConfiguration;
-import org.mule.runtime.http.api.client.HttpClientConfiguration.Builder;
 import org.mule.runtime.http.api.client.HttpRequestOptions;
 import org.mule.runtime.http.api.client.proxy.ProxyConfig;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
@@ -33,11 +31,13 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import com.github.benmanes.caffeine.cache.LoadingCache;
+
 public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilder<D> {
 
   protected final LockFactory lockProvider;
   protected final Map<String, DefaultResourceOwnerOAuthContext> tokensStore;
-  protected final HttpService httpService;
+  protected final LoadingCache<Pair<TlsContextFactory, ProxyConfig>, HttpClient> httpClientCache;
   protected final MuleExpressionLanguage expressionEvaluator;
 
   protected String clientId;
@@ -54,11 +54,13 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
   protected Map<String, String> customParametersExtractorsExprs;
   protected Function<String, String> resourceOwnerIdTransformer = resourceOwnerId -> resourceOwnerId;
 
-  public AbstractOAuthDancerBuilder(LockFactory lockProvider, Map<String, DefaultResourceOwnerOAuthContext> tokensStore,
-                                    HttpService httpService, MuleExpressionLanguage expressionEvaluator) {
+  public AbstractOAuthDancerBuilder(LockFactory lockProvider,
+                                    Map<String, DefaultResourceOwnerOAuthContext> tokensStore,
+                                    LoadingCache<Pair<TlsContextFactory, ProxyConfig>, HttpClient> httpClientCache,
+                                    MuleExpressionLanguage expressionEvaluator) {
     this.lockProvider = lockProvider;
     this.tokensStore = tokensStore;
-    this.httpService = httpService;
+    this.httpClientCache = httpClientCache;
     this.expressionEvaluator = expressionEvaluator;
   }
 
@@ -77,6 +79,7 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
     return withClientCredentialsIn(BASIC_AUTH_HEADER);
   }
 
+  @Override
   public OAuthDancerBuilder withClientCredentialsIn(ClientCredentialsLocation clientCredentialsLocation) {
     this.clientCredentialsLocation = clientCredentialsLocation;
     return this;
@@ -84,13 +87,7 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
 
   @Override
   public OAuthDancerBuilder tokenUrl(String tokenUrl) {
-    this.tokenUrl = tokenUrl;
-    this.httpClientFactory = () -> {
-      final Builder clientConfigBuilder =
-          new HttpClientConfiguration.Builder().setName(format("oauthToken.requester[%s]", tokenUrl));
-      return httpService.getClientFactory().create(clientConfigBuilder.build());
-    };
-    return this;
+    return tokenUrl(tokenUrl, null, null);
   }
 
   @Override
@@ -125,25 +122,19 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
 
   @Override
   public OAuthDancerBuilder<D> tokenUrl(String tokenUrl, ProxyConfig proxyConfig) {
-    tokenUrl(tokenUrl, null, proxyConfig);
-    return this;
+    return tokenUrl(tokenUrl, null, proxyConfig);
   }
 
   @Override
   public OAuthDancerBuilder tokenUrl(String tokenUrl, TlsContextFactory tlsContextFactory) {
-    tokenUrl(tokenUrl, tlsContextFactory, null);
-    return this;
+    return tokenUrl(tokenUrl, tlsContextFactory, null);
   }
 
   @Override
   public OAuthDancerBuilder<D> tokenUrl(String tokenUrl, TlsContextFactory tlsContextFactory, ProxyConfig proxyConfig) {
     this.tokenUrl = tokenUrl;
     this.httpClientFactory = () -> {
-      final Builder clientConfigBuilder =
-          new HttpClientConfiguration.Builder().setName(format("oauthToken.requester[%s]", tokenUrl));
-      clientConfigBuilder.setTlsContextFactory(tlsContextFactory);
-      clientConfigBuilder.setProxyConfig(proxyConfig);
-      return httpService.getClientFactory().create(clientConfigBuilder.build());
+      return httpClientCache.get(new Pair(tlsContextFactory, proxyConfig));
     };
     return this;
   }
