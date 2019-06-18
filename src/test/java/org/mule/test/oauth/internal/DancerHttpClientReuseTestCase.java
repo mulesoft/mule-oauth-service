@@ -35,8 +35,6 @@ import io.qameta.allure.Feature;
 @RunWith(Parameterized.class)
 public class DancerHttpClientReuseTestCase extends AbstractOAuthTestCase {
 
-  private static final int GC_POLLING_TIMEOUT = 10000;
-
   private static final TlsContextFactory TLS_A = mock(TlsContextFactory.class);
   private static final TlsContextFactory TLS_B = mock(TlsContextFactory.class);
 
