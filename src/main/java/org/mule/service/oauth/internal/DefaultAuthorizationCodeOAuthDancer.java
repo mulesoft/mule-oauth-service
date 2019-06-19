@@ -33,6 +33,8 @@ import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.AUTHORIZAT
 import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.NO_AUTHORIZATION_CODE_STATUS;
 import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.TOKEN_NOT_FOUND_STATUS;
 import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.TOKEN_URL_CALL_FAILED_STATUS;
+import static org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext.DancerState.HAS_TOKEN;
+import static org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext.DancerState.REFRESHING_TOKEN;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
 import static org.mule.service.oauth.internal.OAuthConstants.CODE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_AUTHENTICATION_CODE;
@@ -42,6 +44,7 @@ import static org.mule.service.oauth.internal.OAuthConstants.REDIRECT_URI_PARAME
 import static org.mule.service.oauth.internal.OAuthConstants.REFRESH_TOKEN_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.STATE_PARAMETER;
 import static org.slf4j.LoggerFactory.getLogger;
+
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.DefaultMuleException;
 import org.mule.runtime.api.exception.MuleException;
@@ -141,7 +144,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
                                              Supplier<Map<String, String>> customHeaders,
                                              Map<String, String> customParametersExtractorsExprs,
                                              Function<String, String> resourceOwnerIdTransformer,
-                                             LockFactory lockProvider, Map<String, DefaultResourceOwnerOAuthContext> tokensStore,
+                                             LockFactory lockProvider, Map<String, ResourceOwnerOAuthContext> tokensStore,
                                              HttpClient httpClient, MuleExpressionLanguage expressionEvaluator,
                                              Function<AuthorizationCodeRequest, AuthorizationCodeDanceCallbackContext> beforeDanceCallback,
                                              BiConsumer<AuthorizationCodeDanceCallbackContext, ResourceOwnerOAuthContext> afterDanceCallback,
@@ -210,6 +213,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
         });
       }
 
+      @Override
       public ClassLoader getContextClassLoader() {
         return appRegionClassLoader;
       }
@@ -336,6 +340,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
             });
       }
 
+      @Override
       public ClassLoader getContextClassLoader() {
         return appRegionClassLoader;
       }
@@ -413,6 +418,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
         handleLocalAuthorizationRequest(requestContext.getRequest(), responseCallback);
       }
 
+      @Override
       public ClassLoader getContextClassLoader() {
         return appRegionClassLoader;
       }
@@ -561,6 +567,9 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
           formData = requestParameters;
         }
 
+        resourceOwnerOAuthContext.setDancerState(REFRESHING_TOKEN);
+        updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
+
         CompletableFuture<Void> refreshFuture =
             invokeTokenUrl(tokenUrl, formData, queryParams, emptyMultiMap(), authorization, true, encoding)
                 .thenAccept(tokenResponse -> {
@@ -572,6 +581,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
                             .debug("Update OAuth Context for resourceOwnerId %s", resourceOwnerOAuthContext.getResourceOwnerId());
                       }
                       updateResourceOwnerState(resourceOwnerOAuthContext, null, tokenResponse);
+                      resourceOwnerOAuthContext.setDancerState(HAS_TOKEN);
                       updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
                       listeners.forEach(l -> l.onTokenRefreshed(resourceOwnerOAuthContext));
                     });

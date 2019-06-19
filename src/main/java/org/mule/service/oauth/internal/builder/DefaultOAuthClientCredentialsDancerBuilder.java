@@ -20,7 +20,7 @@ import org.mule.runtime.http.api.client.proxy.ProxyConfig;
 import org.mule.runtime.oauth.api.ClientCredentialsOAuthDancer;
 import org.mule.runtime.oauth.api.builder.ClientCredentialsListener;
 import org.mule.runtime.oauth.api.builder.OAuthClientCredentialsDancerBuilder;
-import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
+import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
 import org.mule.service.oauth.internal.DefaultClientCredentialsOAuthDancer;
 
 import java.util.LinkedList;
@@ -39,7 +39,7 @@ public class DefaultOAuthClientCredentialsDancerBuilder extends AbstractOAuthDan
 
 
   public DefaultOAuthClientCredentialsDancerBuilder(LockFactory lockProvider,
-                                                    Map<String, DefaultResourceOwnerOAuthContext> tokensStore,
+                                                    Map<String, ResourceOwnerOAuthContext> tokensStore,
                                                     LoadingCache<Pair<TlsContextFactory, ProxyConfig>, HttpClient> httpClientCache,
                                                     MuleExpressionLanguage expressionEvaluator) {
     super(lockProvider, tokensStore, httpClientCache, expressionEvaluator);

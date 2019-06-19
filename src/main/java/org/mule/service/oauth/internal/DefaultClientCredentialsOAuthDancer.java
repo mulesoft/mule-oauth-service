@@ -10,11 +10,14 @@ import static java.lang.Thread.currentThread;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static org.mule.runtime.api.util.Preconditions.checkArgument;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
+import static org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext.DancerState.HAS_TOKEN;
+import static org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext.DancerState.REFRESHING_TOKEN;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_CLIENT_CREDENTIALS;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.SCOPE_PARAMETER;
 import static org.slf4j.LoggerFactory.getLogger;
+
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.lifecycle.LifecycleException;
@@ -55,8 +58,8 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
   private static final Logger LOGGER = getLogger(DefaultClientCredentialsOAuthDancer.class);
 
   private boolean accessTokenRefreshedOnStart = false;
-  private MultiMap<String, String> customParameters;
-  private MultiMap<String, String> customHeaders;
+  private final MultiMap<String, String> customParameters;
+  private final MultiMap<String, String> customHeaders;
   private final List<ClientCredentialsListener> listeners;
 
   public DefaultClientCredentialsOAuthDancer(String clientId, String clientSecret, String tokenUrl, String scopes,
@@ -64,7 +67,7 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
                                              String responseAccessTokenExpr, String responseRefreshTokenExpr,
                                              String responseExpiresInExpr, Map<String, String> customParametersExprs,
                                              Function<String, String> resourceOwnerIdTransformer, LockFactory lockProvider,
-                                             Map<String, DefaultResourceOwnerOAuthContext> tokensStore, HttpClient httpClient,
+                                             Map<String, ResourceOwnerOAuthContext> tokensStore, HttpClient httpClient,
                                              MuleExpressionLanguage expressionEvaluator,
                                              MultiMap<String, String> customParameters,
                                              MultiMap<String, String> customHeaders,
@@ -152,6 +155,8 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
   }
 
   private CompletableFuture<Void> doRefreshTokenRequest(boolean notifyListeners) {
+    final DefaultResourceOwnerOAuthContext defaultUserState = (DefaultResourceOwnerOAuthContext) getContext();
+
     final Map<String, String> formData = new HashMap<>();
 
     formData.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_CLIENT_CREDENTIALS);
@@ -159,6 +164,9 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
       formData.put(SCOPE_PARAMETER, scopes);
     }
     String authorization = handleClientCredentials(formData);
+
+    defaultUserState.setDancerState(REFRESHING_TOKEN);
+    updateResourceOwnerOAuthContext(defaultUserState);
 
     return invokeTokenUrl(tokenUrl, formData, customParameters, customHeaders, authorization, false, encoding)
         .thenAccept(tokenResponse -> {
@@ -168,7 +176,6 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
                            tokenResponse.getAccessToken(), tokenResponse.getRefreshToken(), tokenResponse.getExpiresIn());
             }
 
-            final DefaultResourceOwnerOAuthContext defaultUserState = (DefaultResourceOwnerOAuthContext) getContext();
             defaultUserState.setAccessToken(tokenResponse.getAccessToken());
             defaultUserState.setExpiresIn(tokenResponse.getExpiresIn());
             for (Entry<String, Object> customResponseParameterEntry : tokenResponse.getCustomResponseParameters().entrySet()) {
@@ -176,6 +183,7 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
                                                                 customResponseParameterEntry.getValue());
             }
 
+            defaultUserState.setDancerState(HAS_TOKEN);
             updateResourceOwnerOAuthContext(defaultUserState);
             if (notifyListeners) {
               listeners.forEach(l -> l.onTokenRefreshed(defaultUserState));

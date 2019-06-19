@@ -21,7 +21,7 @@ import org.mule.runtime.http.api.domain.message.request.HttpRequest;
 import org.mule.runtime.http.api.domain.message.response.HttpResponse;
 import org.mule.runtime.oauth.api.builder.ClientCredentialsLocation;
 import org.mule.runtime.oauth.api.builder.OAuthDancerBuilder;
-import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
+import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -36,7 +36,7 @@ import com.github.benmanes.caffeine.cache.LoadingCache;
 public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilder<D> {
 
   protected final LockFactory lockProvider;
-  protected final Map<String, DefaultResourceOwnerOAuthContext> tokensStore;
+  protected final Map<String, ResourceOwnerOAuthContext> tokensStore;
   protected final LoadingCache<Pair<TlsContextFactory, ProxyConfig>, HttpClient> httpClientCache;
   protected final MuleExpressionLanguage expressionEvaluator;
 
@@ -55,7 +55,7 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
   protected Function<String, String> resourceOwnerIdTransformer = resourceOwnerId -> resourceOwnerId;
 
   public AbstractOAuthDancerBuilder(LockFactory lockProvider,
-                                    Map<String, DefaultResourceOwnerOAuthContext> tokensStore,
+                                    Map<String, ResourceOwnerOAuthContext> tokensStore,
                                     LoadingCache<Pair<TlsContextFactory, ProxyConfig>, HttpClient> httpClientCache,
                                     MuleExpressionLanguage expressionEvaluator) {
     this.lockProvider = lockProvider;
