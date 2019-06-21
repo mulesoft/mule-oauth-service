@@ -40,6 +40,8 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
   protected final LoadingCache<Pair<TlsContextFactory, ProxyConfig>, HttpClient> httpClientCache;
   protected final MuleExpressionLanguage expressionEvaluator;
 
+  protected String name = toString();
+
   protected String clientId;
   protected String clientSecret;
   protected ClientCredentialsLocation clientCredentialsLocation = BASIC_AUTH_HEADER;
@@ -62,6 +64,12 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
     this.tokensStore = tokensStore;
     this.httpClientCache = httpClientCache;
     this.expressionEvaluator = expressionEvaluator;
+  }
+
+  @Override
+  public OAuthDancerBuilder<D> name(String name) {
+    this.name = name;
+    return this;
   }
 
   @Override

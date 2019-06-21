@@ -33,9 +33,9 @@ import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.AUTHORIZAT
 import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.NO_AUTHORIZATION_CODE_STATUS;
 import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.TOKEN_NOT_FOUND_STATUS;
 import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.TOKEN_URL_CALL_FAILED_STATUS;
-import static org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext.DancerState.HAS_TOKEN;
-import static org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext.DancerState.REFRESHING_TOKEN;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
+import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.HAS_TOKEN;
+import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.REFRESHING_TOKEN;
 import static org.mule.service.oauth.internal.OAuthConstants.CODE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_AUTHENTICATION_CODE;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_PARAMETER;
@@ -133,7 +133,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
   private RequestHandlerManager redirectUrlHandlerManager;
   private RequestHandlerManager localAuthorizationUrlHandlerManager;
 
-  public DefaultAuthorizationCodeOAuthDancer(Optional<HttpServer> httpServer, String clientId, String clientSecret,
+  public DefaultAuthorizationCodeOAuthDancer(Optional<HttpServer> httpServer, String name, String clientId, String clientSecret,
                                              String tokenUrl, String scopes, ClientCredentialsLocation clientCredentialsLocation,
                                              String externalCallbackUrl, Charset encoding,
                                              String localCallbackUrlPath, String localAuthorizationUrlPath,
@@ -149,7 +149,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
                                              Function<AuthorizationCodeRequest, AuthorizationCodeDanceCallbackContext> beforeDanceCallback,
                                              BiConsumer<AuthorizationCodeDanceCallbackContext, ResourceOwnerOAuthContext> afterDanceCallback,
                                              List<AuthorizationCodeListener> listeners) {
-    super(clientId, clientSecret, tokenUrl, encoding, scopes, clientCredentialsLocation, responseAccessTokenExpr,
+    super(name, clientId, clientSecret, tokenUrl, encoding, scopes, clientCredentialsLocation, responseAccessTokenExpr,
           responseRefreshTokenExpr,
           responseExpiresInExpr, customParametersExtractorsExprs, resourceOwnerIdTransformer, lockProvider, tokensStore,
           httpClient, expressionEvaluator);
@@ -539,7 +539,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
       return activeRefreshFuture;
     }
 
-    Lock lock = resourceOwnerOAuthContext.getRefreshUserOAuthContextLock();
+    Lock lock = resourceOwnerOAuthContext.getRefreshUserOAuthContextLock(toString() + "-config-oauth-context", getLockProvider());
     final boolean lockWasAcquired = lock.tryLock();
     if (lockWasAcquired) {
       try {

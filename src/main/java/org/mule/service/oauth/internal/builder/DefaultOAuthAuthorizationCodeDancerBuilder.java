@@ -213,7 +213,7 @@ public class DefaultOAuthAuthorizationCodeDancerBuilder extends AbstractOAuthDan
 
     Optional<HttpServer> httpServer = localCallbackServerFactory != null ? of(localCallbackServerFactory.get()) : empty();
 
-    return new DefaultAuthorizationCodeOAuthDancer(httpServer, clientId, clientSecret,
+    return new DefaultAuthorizationCodeOAuthDancer(httpServer, name, clientId, clientSecret,
                                                    tokenUrl, scopes, clientCredentialsLocation, externalCallbackUrl, encoding,
                                                    localCallbackUrlPath, localAuthorizationUrlPath,
                                                    localAuthorizationUrlResourceOwnerId, state,

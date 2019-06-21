@@ -88,7 +88,7 @@ public class DefaultOAuthClientCredentialsDancerBuilder extends AbstractOAuthDan
     checkArgument(isNotBlank(clientSecret), "clientSecret cannot be blank");
     checkArgument(isNotBlank(tokenUrl), "tokenUrl cannot be blank");
 
-    return new DefaultClientCredentialsOAuthDancer(clientId, clientSecret, tokenUrl, scopes, clientCredentialsLocation,
+    return new DefaultClientCredentialsOAuthDancer(name, clientId, clientSecret, tokenUrl, scopes, clientCredentialsLocation,
                                                    encoding, responseAccessTokenExpr, responseRefreshTokenExpr,
                                                    responseExpiresInExpr, customParametersExtractorsExprs,
                                                    resourceOwnerIdTransformer, lockProvider, tokensStore,

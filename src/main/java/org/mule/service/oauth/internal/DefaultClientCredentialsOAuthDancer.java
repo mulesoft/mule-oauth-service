@@ -10,9 +10,9 @@ import static java.lang.Thread.currentThread;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static org.mule.runtime.api.util.Preconditions.checkArgument;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
-import static org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext.DancerState.HAS_TOKEN;
-import static org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext.DancerState.REFRESHING_TOKEN;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
+import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.HAS_TOKEN;
+import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.REFRESHING_TOKEN;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_CLIENT_CREDENTIALS;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.SCOPE_PARAMETER;
@@ -62,7 +62,7 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
   private final MultiMap<String, String> customHeaders;
   private final List<ClientCredentialsListener> listeners;
 
-  public DefaultClientCredentialsOAuthDancer(String clientId, String clientSecret, String tokenUrl, String scopes,
+  public DefaultClientCredentialsOAuthDancer(String name, String clientId, String clientSecret, String tokenUrl, String scopes,
                                              ClientCredentialsLocation clientCredentialsLocation, Charset encoding,
                                              String responseAccessTokenExpr, String responseRefreshTokenExpr,
                                              String responseExpiresInExpr, Map<String, String> customParametersExprs,
@@ -72,7 +72,7 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
                                              MultiMap<String, String> customParameters,
                                              MultiMap<String, String> customHeaders,
                                              List<ClientCredentialsListener> listeners) {
-    super(clientId, clientSecret, tokenUrl, encoding, scopes, clientCredentialsLocation, responseAccessTokenExpr,
+    super(name, clientId, clientSecret, tokenUrl, encoding, scopes, clientCredentialsLocation, responseAccessTokenExpr,
           responseRefreshTokenExpr, responseExpiresInExpr, customParametersExprs, resourceOwnerIdTransformer, lockProvider,
           tokensStore, httpClient,
           expressionEvaluator);
