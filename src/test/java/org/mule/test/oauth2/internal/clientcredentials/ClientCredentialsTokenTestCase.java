@@ -107,6 +107,24 @@ public class ClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
     }
   }
 
+  @Test
+  public void refreshTokenOnceAtATimeSequential() throws Exception {
+    final Map<String, ?> tokensStore = new HashMap<>();
+    final OAuthClientCredentialsDancerBuilder builder = baseClientCredentialsDancerBuilder(tokensStore);
+    builder.tokenUrl("http://host/token");
+    ClientCredentialsOAuthDancer minimalDancer = startDancer(builder);
+
+    tokensStore.clear();
+
+    final CompletableFuture<Void> refreshToken1 = minimalDancer.refreshToken();
+    final CompletableFuture<Void> refreshToken2 = minimalDancer.refreshToken();
+    refreshToken1.get();
+    refreshToken2.get();
+
+    verify(httpClient, times(2)).sendAsync(argThat(new HttpRequestUrlMatcher("http://host/token")),
+                                           any(HttpRequestOptions.class));
+  }
+
   private static class HttpRequestUrlMatcher implements ArgumentMatcher<HttpRequest> {
 
     private final URI uri;

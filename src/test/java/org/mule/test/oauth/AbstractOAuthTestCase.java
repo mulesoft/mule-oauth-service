@@ -6,7 +6,9 @@
  */
 package org.mule.test.oauth;
 
-import static java.util.concurrent.CompletableFuture.supplyAsync;
+import static java.lang.Thread.currentThread;
+import static java.lang.Thread.sleep;
+import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -35,10 +37,13 @@ import org.mule.tck.junit4.AbstractMuleContextTestCase;
 import java.io.StringReader;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 
 import javax.inject.Inject;
 
 import org.apache.commons.io.input.ReaderInputStream;
+import org.junit.After;
 import org.junit.Before;
 
 public abstract class AbstractOAuthTestCase extends AbstractMuleContextTestCase {
@@ -47,6 +52,8 @@ public abstract class AbstractOAuthTestCase extends AbstractMuleContextTestCase 
   protected HttpClientFactory httpClientFactory;
   protected HttpClient httpClient;
   protected HttpServer httpServer;
+
+  protected ExecutorService httpClientCallbackExecutor;
 
   @Inject
   protected LockFactory lockFactory;
@@ -62,6 +69,8 @@ public abstract class AbstractOAuthTestCase extends AbstractMuleContextTestCase 
 
   @Before
   public void setupServices() throws Exception {
+    httpClientCallbackExecutor = newSingleThreadExecutor();
+
     final HttpService httpService = mock(HttpService.class);
     httpClientFactory = mock(HttpClientFactory.class);
     httpClient = mock(HttpClient.class);
@@ -79,7 +88,27 @@ public abstract class AbstractOAuthTestCase extends AbstractMuleContextTestCase 
     final InputStreamHttpEntity httpEntity = mock(InputStreamHttpEntity.class);
     when(httpEntity.getContent()).thenReturn(new ReaderInputStream(new StringReader("")));
     when(httpResponse.getEntity()).thenReturn(httpEntity);
-    when(httpClient.sendAsync(any(), any())).thenReturn(supplyAsync(() -> httpResponse));
+    when(httpClient.sendAsync(any(), any())).thenAnswer(invocation -> {
+
+      final CompletableFuture<HttpResponse> httpResponseFuture = new CompletableFuture<>();
+
+      httpClientCallbackExecutor.execute(() -> {
+        try {
+          sleep(10);
+        } catch (InterruptedException e) {
+          currentThread().interrupt();
+          httpResponseFuture.completeExceptionally(e);
+        }
+        httpResponseFuture.complete(httpResponse);
+      });
+
+      return httpResponseFuture;
+    });
+  }
+
+  @After
+  public void teardownServices() {
+    httpClientCallbackExecutor.shutdown();
   }
 
   protected OAuthClientCredentialsDancerBuilder baseClientCredentialsDancerBuilder() {

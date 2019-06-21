@@ -9,6 +9,7 @@ package org.mule.service.oauth.internal;
 import static java.lang.String.format;
 import static java.lang.String.valueOf;
 import static java.lang.Thread.currentThread;
+import static java.lang.Thread.sleep;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singleton;
 import static java.util.concurrent.CompletableFuture.completedFuture;
@@ -35,6 +36,7 @@ import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.TOKEN_NOT_
 import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.TOKEN_URL_CALL_FAILED_STATUS;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.HAS_TOKEN;
+import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.NO_TOKEN;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.REFRESHING_TOKEN;
 import static org.mule.service.oauth.internal.OAuthConstants.CODE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_AUTHENTICATION_CODE;
@@ -94,8 +96,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -518,8 +521,6 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
     return completedFuture(accessToken);
   }
 
-  private static final Map<String, CompletableFuture<Void>> activeRefreshFutures = new ConcurrentHashMap<>();
-
   @Override
   public CompletableFuture<Void> refreshToken(String resourceOwner) {
     return refreshToken(resourceOwner, false);
@@ -530,79 +531,109 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Executing refresh token for user " + resourceOwner);
     }
-    final DefaultResourceOwnerOAuthContext resourceOwnerOAuthContext =
-        (DefaultResourceOwnerOAuthContext) getContextForResourceOwner(resourceOwner);
+    ResourceOwnerOAuthContext resourceOwnerOAuthContext = getContextForResourceOwner(resourceOwner);
 
-    String nullSafeResourceOwner = "" + resourceOwner;
-    CompletableFuture<Void> activeRefreshFuture = activeRefreshFutures.get(nullSafeResourceOwner);
-    if (activeRefreshFuture != null) {
-      return activeRefreshFuture;
+    final Lock lock = resourceOwnerOAuthContext.getRefreshUserOAuthContextLock(name, getLockProvider());
+
+    // If the context was just created, initialize it.
+    if (resourceOwnerOAuthContext.getDancerState() == NO_TOKEN) {
+      if (lock.tryLock()) {
+        try {
+          resourceOwnerOAuthContext = getContextForResourceOwner(resourceOwner);
+          if (resourceOwnerOAuthContext.getDancerState() == NO_TOKEN) {
+            return doRefreshTokenRequest(useQueryParameters, (DefaultResourceOwnerOAuthContext) resourceOwnerOAuthContext);
+          }
+        } finally {
+          lock.unlock();
+        }
+      }
     }
 
-    Lock lock = resourceOwnerOAuthContext.getRefreshUserOAuthContextLock(toString() + "-config-oauth-context", getLockProvider());
-    final boolean lockWasAcquired = lock.tryLock();
-    if (lockWasAcquired) {
-      try {
-        final String userRefreshToken = resourceOwnerOAuthContext.getRefreshToken();
-        if (userRefreshToken == null) {
-          throw new MuleRuntimeException(createStaticMessage(
-                                                             "The user with user id %s has no refresh token in his OAuth state so we can't execute the refresh token call",
-                                                             resourceOwnerOAuthContext.getResourceOwnerId()));
-        }
-
-        final MultiMap<String, String> requestParameters = new MultiMap<>();
-        requestParameters.put(REFRESH_TOKEN_PARAMETER, userRefreshToken);
-        String authorization = handleClientCredentials(requestParameters);
-        requestParameters.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_REFRESH_TOKEN);
-        requestParameters.put(REDIRECT_URI_PARAMETER, externalCallbackUrl);
-
-        MultiMap<String, String> queryParams;
-        Map<String, String> formData;
-
-        if (useQueryParameters) {
-          queryParams = requestParameters;
-          formData = emptyMap();
-        } else {
-          queryParams = emptyMultiMap();
-          formData = requestParameters;
-        }
-
-        resourceOwnerOAuthContext.setDancerState(REFRESHING_TOKEN);
-        updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
-
-        CompletableFuture<Void> refreshFuture =
-            invokeTokenUrl(tokenUrl, formData, queryParams, emptyMultiMap(), authorization, true, encoding)
-                .thenAccept(tokenResponse -> {
-                  lock.lock();
-                  try {
-                    withContextClassLoader(DefaultAuthorizationCodeOAuthDancer.class.getClassLoader(), () -> {
-                      if (LOGGER.isDebugEnabled()) {
-                        LOGGER
-                            .debug("Update OAuth Context for resourceOwnerId %s", resourceOwnerOAuthContext.getResourceOwnerId());
-                      }
-                      updateResourceOwnerState(resourceOwnerOAuthContext, null, tokenResponse);
-                      resourceOwnerOAuthContext.setDancerState(HAS_TOKEN);
-                      updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
-                      listeners.forEach(l -> l.onTokenRefreshed(resourceOwnerOAuthContext));
-                    });
-                  } finally {
-                    lock.unlock();
-                  }
-                });
-        activeRefreshFutures.put(nullSafeResourceOwner, refreshFuture);
-        refreshFuture.thenRun(() -> activeRefreshFutures.remove(nullSafeResourceOwner, refreshFuture));
-        return refreshFuture;
-      } finally {
-        lock.unlock();
-      }
-    } else {
+    // If there is a previous token, refresh it
+    if (resourceOwnerOAuthContext.getDancerState() == HAS_TOKEN) {
       lock.lock();
       try {
-        return activeRefreshFutures.get(nullSafeResourceOwner);
+        if (resourceOwnerOAuthContext.getDancerState() == HAS_TOKEN) {
+          return doRefreshTokenRequest(useQueryParameters, (DefaultResourceOwnerOAuthContext) resourceOwnerOAuthContext);
+        }
       } finally {
         lock.unlock();
       }
     }
+
+    // otherwise, there is a pending refresh being processed
+    // TODO create a completableFuture, dispatch a poll on the OS till the accessToken is present in an IO pool, and when that
+    // happens, complete the returned future.
+    final CompletableFuture<Void> pendingResponse = new CompletableFuture<>();
+
+    Executors.newSingleThreadExecutor().execute(() -> {
+      DefaultResourceOwnerOAuthContext ctx = (DefaultResourceOwnerOAuthContext) getContextForResourceOwner(resourceOwner);
+
+      while (ctx.getDancerState() == REFRESHING_TOKEN) {
+        try {
+          sleep(100);
+        } catch (InterruptedException e) {
+          currentThread().interrupt();
+          pendingResponse.completeExceptionally(e);
+        }
+        ctx = (DefaultResourceOwnerOAuthContext) getContextForResourceOwner(resourceOwner);
+      }
+      pendingResponse.complete(null);
+    });
+
+    return pendingResponse;
+  }
+
+  protected CompletableFuture<Void> doRefreshTokenRequest(boolean useQueryParameters,
+                                                          final DefaultResourceOwnerOAuthContext resourceOwnerOAuthContext) {
+    final String userRefreshToken = resourceOwnerOAuthContext.getRefreshToken();
+    if (userRefreshToken == null) {
+      throw new MuleRuntimeException(createStaticMessage(
+                                                         "The user with user id %s has no refresh token in his OAuth state so we can't execute the refresh token call",
+                                                         resourceOwnerOAuthContext.getResourceOwnerId()));
+    }
+
+    final MultiMap<String, String> requestParameters = new MultiMap<>();
+    requestParameters.put(REFRESH_TOKEN_PARAMETER, userRefreshToken);
+    String authorization = handleClientCredentials(requestParameters);
+    requestParameters.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_REFRESH_TOKEN);
+    requestParameters.put(REDIRECT_URI_PARAMETER, externalCallbackUrl);
+
+    MultiMap<String, String> queryParams;
+    Map<String, String> formData;
+
+    if (useQueryParameters) {
+      queryParams = requestParameters;
+      formData = emptyMap();
+    } else {
+      queryParams = emptyMultiMap();
+      formData = requestParameters;
+    }
+
+    resourceOwnerOAuthContext.setDancerState(REFRESHING_TOKEN);
+    updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
+
+    return invokeTokenUrl(tokenUrl, formData, queryParams, emptyMultiMap(), authorization, true, encoding)
+        .thenAccept(tokenResponse -> {
+          withContextClassLoader(DefaultAuthorizationCodeOAuthDancer.class.getClassLoader(), () -> {
+            if (LOGGER.isDebugEnabled()) {
+              LOGGER.debug("Update OAuth Context for resourceOwnerId %s", resourceOwnerOAuthContext.getResourceOwnerId());
+            }
+            updateResourceOwnerState(resourceOwnerOAuthContext, null, tokenResponse);
+            resourceOwnerOAuthContext.setDancerState(HAS_TOKEN);
+            updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
+            listeners.forEach(l -> l.onTokenRefreshed(resourceOwnerOAuthContext));
+          });
+        })
+        .exceptionally(t -> {
+          resourceOwnerOAuthContext.setDancerState(NO_TOKEN);
+          updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
+          if (t instanceof CompletionException) {
+            throw (CompletionException) t;
+          } else {
+            throw new CompletionException(t);
+          }
+        });
   }
 
   private void updateResourceOwnerState(DefaultResourceOwnerOAuthContext resourceOwnerOAuthContext, String newState,

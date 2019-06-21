@@ -63,7 +63,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.commons.io.input.ReaderInputStream;
 import org.junit.Before;
@@ -397,8 +396,8 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
     final AuthorizationCodeOAuthDancer dancer1 = startDancer(builder1);
     final AuthorizationCodeOAuthDancer dancer2 = startDancer(builder2);
 
-    final DefaultResourceOwnerOAuthContext contextOwnerConn1 = new DefaultResourceOwnerOAuthContext(new ReentrantLock(), "owner");
-    final DefaultResourceOwnerOAuthContext contextOwnerConn2 = new DefaultResourceOwnerOAuthContext(new ReentrantLock(), "owner");
+    final DefaultResourceOwnerOAuthContext contextOwnerConn1 = new DefaultResourceOwnerOAuthContext("owner");
+    final DefaultResourceOwnerOAuthContext contextOwnerConn2 = new DefaultResourceOwnerOAuthContext("owner");
     tokensStore.put("conn1-owner", contextOwnerConn1);
     tokensStore.put("conn2-owner", contextOwnerConn2);
 
