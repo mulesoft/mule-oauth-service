@@ -12,6 +12,7 @@ import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.BODY;
 
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.lock.LockFactory;
+import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.runtime.api.tls.TlsContextFactory;
 import org.mule.runtime.api.util.Pair;
 import org.mule.runtime.http.api.client.HttpClient;
@@ -35,6 +36,7 @@ import com.github.benmanes.caffeine.cache.LoadingCache;
 
 public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilder<D> {
 
+  protected final SchedulerService schedulerService;
   protected final LockFactory lockProvider;
   protected final Map<String, ResourceOwnerOAuthContext> tokensStore;
   protected final LoadingCache<Pair<TlsContextFactory, ProxyConfig>, HttpClient> httpClientCache;
@@ -56,10 +58,11 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
   protected Map<String, String> customParametersExtractorsExprs;
   protected Function<String, String> resourceOwnerIdTransformer = resourceOwnerId -> resourceOwnerId;
 
-  public AbstractOAuthDancerBuilder(LockFactory lockProvider,
+  public AbstractOAuthDancerBuilder(SchedulerService schedulerService, LockFactory lockProvider,
                                     Map<String, ResourceOwnerOAuthContext> tokensStore,
                                     LoadingCache<Pair<TlsContextFactory, ProxyConfig>, HttpClient> httpClientCache,
                                     MuleExpressionLanguage expressionEvaluator) {
+    this.schedulerService = schedulerService;
     this.lockProvider = lockProvider;
     this.tokensStore = tokensStore;
     this.httpClientCache = httpClientCache;

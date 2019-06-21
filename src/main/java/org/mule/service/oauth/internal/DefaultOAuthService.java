@@ -96,7 +96,7 @@ public final class DefaultOAuthService implements OAuthService {
   public <T> OAuthClientCredentialsDancerBuilder clientCredentialsGrantTypeDancerBuilder(LockFactory lockProvider,
                                                                                          Map<String, T> tokensStore,
                                                                                          MuleExpressionLanguage expressionEvaluator) {
-    return new DefaultOAuthClientCredentialsDancerBuilder(lockProvider,
+    return new DefaultOAuthClientCredentialsDancerBuilder(schedulerService, lockProvider,
                                                           (Map<String, ResourceOwnerOAuthContext>) tokensStore,
                                                           httpClientCache, expressionEvaluator);
   }

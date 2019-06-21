@@ -19,7 +19,6 @@ import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.lifecycle.InitialisationException;
 import org.mule.runtime.api.lock.LockFactory;
-import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.runtime.http.api.HttpService;
 import org.mule.runtime.http.api.client.HttpClient;
 import org.mule.runtime.http.api.client.HttpClientFactory;
@@ -32,6 +31,7 @@ import org.mule.runtime.oauth.api.builder.OAuthAuthorizationCodeDancerBuilder;
 import org.mule.runtime.oauth.api.builder.OAuthClientCredentialsDancerBuilder;
 import org.mule.runtime.oauth.api.builder.OAuthDancerBuilder;
 import org.mule.service.oauth.internal.DefaultOAuthService;
+import org.mule.tck.SimpleUnitTestSupportSchedulerService;
 import org.mule.tck.junit4.AbstractMuleContextTestCase;
 
 import java.io.StringReader;
@@ -82,7 +82,7 @@ public abstract class AbstractOAuthTestCase extends AbstractMuleContextTestCase 
     when(httpServerFactory.create(any())).thenReturn(httpServer);
     when(httpService.getServerFactory()).thenReturn(httpServerFactory);
 
-    service = new DefaultOAuthService(httpService, mock(SchedulerService.class));
+    service = new DefaultOAuthService(httpService, new SimpleUnitTestSupportSchedulerService());
 
     final HttpResponse httpResponse = mock(HttpResponse.class);
     final InputStreamHttpEntity httpEntity = mock(InputStreamHttpEntity.class);

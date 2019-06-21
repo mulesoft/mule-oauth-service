@@ -9,7 +9,6 @@ package org.mule.service.oauth.internal;
 import static java.lang.String.format;
 import static java.lang.String.valueOf;
 import static java.lang.Thread.currentThread;
-import static java.lang.Thread.sleep;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singleton;
 import static java.util.concurrent.CompletableFuture.completedFuture;
@@ -37,7 +36,6 @@ import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.TOKEN_URL_
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.HAS_TOKEN;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.NO_TOKEN;
-import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.REFRESHING_TOKEN;
 import static org.mule.service.oauth.internal.OAuthConstants.CODE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_AUTHENTICATION_CODE;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_PARAMETER;
@@ -55,6 +53,7 @@ import org.mule.runtime.api.lifecycle.InitialisationException;
 import org.mule.runtime.api.lifecycle.Lifecycle;
 import org.mule.runtime.api.lock.LockFactory;
 import org.mule.runtime.api.metadata.MediaType;
+import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.runtime.api.util.MultiMap;
 import org.mule.runtime.core.api.util.IOUtils;
 import org.mule.runtime.core.api.util.StringUtils;
@@ -98,8 +97,6 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
-import java.util.concurrent.locks.Lock;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -147,14 +144,16 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
                                              Supplier<Map<String, String>> customHeaders,
                                              Map<String, String> customParametersExtractorsExprs,
                                              Function<String, String> resourceOwnerIdTransformer,
-                                             LockFactory lockProvider, Map<String, ResourceOwnerOAuthContext> tokensStore,
+                                             SchedulerService schedulerService, LockFactory lockProvider,
+                                             Map<String, ResourceOwnerOAuthContext> tokensStore,
                                              HttpClient httpClient, MuleExpressionLanguage expressionEvaluator,
                                              Function<AuthorizationCodeRequest, AuthorizationCodeDanceCallbackContext> beforeDanceCallback,
                                              BiConsumer<AuthorizationCodeDanceCallbackContext, ResourceOwnerOAuthContext> afterDanceCallback,
                                              List<AuthorizationCodeListener> listeners) {
     super(name, clientId, clientSecret, tokenUrl, encoding, scopes, clientCredentialsLocation, responseAccessTokenExpr,
           responseRefreshTokenExpr,
-          responseExpiresInExpr, customParametersExtractorsExprs, resourceOwnerIdTransformer, lockProvider, tokensStore,
+          responseExpiresInExpr, customParametersExtractorsExprs, resourceOwnerIdTransformer, schedulerService, lockProvider,
+          tokensStore,
           httpClient, expressionEvaluator);
 
     this.httpServer = httpServer;
@@ -531,57 +530,9 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Executing refresh token for user " + resourceOwner);
     }
-    ResourceOwnerOAuthContext resourceOwnerOAuthContext = getContextForResourceOwner(resourceOwner);
 
-    final Lock lock = resourceOwnerOAuthContext.getRefreshUserOAuthContextLock(name, getLockProvider());
-
-    // If the context was just created, initialize it.
-    if (resourceOwnerOAuthContext.getDancerState() == NO_TOKEN) {
-      if (lock.tryLock()) {
-        try {
-          resourceOwnerOAuthContext = getContextForResourceOwner(resourceOwner);
-          if (resourceOwnerOAuthContext.getDancerState() == NO_TOKEN) {
-            return doRefreshTokenRequest(useQueryParameters, (DefaultResourceOwnerOAuthContext) resourceOwnerOAuthContext);
-          }
-        } finally {
-          lock.unlock();
-        }
-      }
-    }
-
-    // If there is a previous token, refresh it
-    if (resourceOwnerOAuthContext.getDancerState() == HAS_TOKEN) {
-      lock.lock();
-      try {
-        if (resourceOwnerOAuthContext.getDancerState() == HAS_TOKEN) {
-          return doRefreshTokenRequest(useQueryParameters, (DefaultResourceOwnerOAuthContext) resourceOwnerOAuthContext);
-        }
-      } finally {
-        lock.unlock();
-      }
-    }
-
-    // otherwise, there is a pending refresh being processed
-    // TODO create a completableFuture, dispatch a poll on the OS till the accessToken is present in an IO pool, and when that
-    // happens, complete the returned future.
-    final CompletableFuture<Void> pendingResponse = new CompletableFuture<>();
-
-    Executors.newSingleThreadExecutor().execute(() -> {
-      DefaultResourceOwnerOAuthContext ctx = (DefaultResourceOwnerOAuthContext) getContextForResourceOwner(resourceOwner);
-
-      while (ctx.getDancerState() == REFRESHING_TOKEN) {
-        try {
-          sleep(100);
-        } catch (InterruptedException e) {
-          currentThread().interrupt();
-          pendingResponse.completeExceptionally(e);
-        }
-        ctx = (DefaultResourceOwnerOAuthContext) getContextForResourceOwner(resourceOwner);
-      }
-      pendingResponse.complete(null);
-    });
-
-    return pendingResponse;
+    return doRefreshToken(() -> getContextForResourceOwner(resourceOwner),
+                          ctx -> doRefreshTokenRequest(useQueryParameters, (DefaultResourceOwnerOAuthContext) ctx));
   }
 
   protected CompletableFuture<Void> doRefreshTokenRequest(boolean useQueryParameters,
@@ -609,9 +560,6 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
       queryParams = emptyMultiMap();
       formData = requestParameters;
     }
-
-    resourceOwnerOAuthContext.setDancerState(REFRESHING_TOKEN);
-    updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
 
     return invokeTokenUrl(tokenUrl, formData, queryParams, emptyMultiMap(), authorization, true, encoding)
         .thenAccept(tokenResponse -> {

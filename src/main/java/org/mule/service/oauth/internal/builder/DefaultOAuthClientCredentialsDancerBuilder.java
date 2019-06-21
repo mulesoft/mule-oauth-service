@@ -12,6 +12,7 @@ import static org.mule.runtime.api.util.Preconditions.checkArgument;
 
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.lock.LockFactory;
+import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.runtime.api.tls.TlsContextFactory;
 import org.mule.runtime.api.util.MultiMap;
 import org.mule.runtime.api.util.Pair;
@@ -38,11 +39,11 @@ public class DefaultOAuthClientCredentialsDancerBuilder extends AbstractOAuthDan
   private final MultiMap<String, String> customHeaders = new MultiMap<>();
 
 
-  public DefaultOAuthClientCredentialsDancerBuilder(LockFactory lockProvider,
+  public DefaultOAuthClientCredentialsDancerBuilder(SchedulerService schedulerService, LockFactory lockProvider,
                                                     Map<String, ResourceOwnerOAuthContext> tokensStore,
                                                     LoadingCache<Pair<TlsContextFactory, ProxyConfig>, HttpClient> httpClientCache,
                                                     MuleExpressionLanguage expressionEvaluator) {
-    super(lockProvider, tokensStore, httpClientCache, expressionEvaluator);
+    super(schedulerService, lockProvider, tokensStore, httpClientCache, expressionEvaluator);
   }
 
   @Override
@@ -91,7 +92,7 @@ public class DefaultOAuthClientCredentialsDancerBuilder extends AbstractOAuthDan
     return new DefaultClientCredentialsOAuthDancer(name, clientId, clientSecret, tokenUrl, scopes, clientCredentialsLocation,
                                                    encoding, responseAccessTokenExpr, responseRefreshTokenExpr,
                                                    responseExpiresInExpr, customParametersExtractorsExprs,
-                                                   resourceOwnerIdTransformer, lockProvider, tokensStore,
+                                                   resourceOwnerIdTransformer, schedulerService, lockProvider, tokensStore,
                                                    httpClientFactory.get(), expressionEvaluator, customParameters,
                                                    customHeaders, listeners);
   }

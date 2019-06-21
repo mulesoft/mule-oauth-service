@@ -7,11 +7,16 @@
 package org.mule.service.oauth.internal;
 
 import static java.lang.String.format;
+import static java.lang.Thread.currentThread;
+import static java.lang.Thread.sleep;
 import static java.util.Collections.singletonMap;
+import static java.util.concurrent.CompletableFuture.completedFuture;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.apache.commons.codec.binary.Base64.encodeBase64String;
 import static org.mule.runtime.api.metadata.DataType.STRING;
 import static org.mule.runtime.api.metadata.MediaType.ANY;
 import static org.mule.runtime.api.metadata.MediaType.parse;
+import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.runtime.http.api.HttpConstants.HttpStatus.BAD_REQUEST;
 import static org.mule.runtime.http.api.HttpConstants.Method.POST;
@@ -22,6 +27,9 @@ import static org.mule.runtime.http.api.utils.HttpEncoderDecoderUtils.encodeStri
 import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.QUERY_PARAMS;
 import static org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext.createRefreshUserOAuthContextLock;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
+import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.HAS_TOKEN;
+import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.NO_TOKEN;
+import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.REFRESHING_TOKEN;
 import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_ID_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_SECRET_PARAMETER;
 
@@ -34,6 +42,8 @@ import org.mule.runtime.api.lock.LockFactory;
 import org.mule.runtime.api.metadata.DataType;
 import org.mule.runtime.api.metadata.MediaType;
 import org.mule.runtime.api.metadata.TypedValue;
+import org.mule.runtime.api.scheduler.Scheduler;
+import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.runtime.api.util.MultiMap;
 import org.mule.runtime.core.api.util.IOUtils;
 import org.mule.runtime.http.api.client.HttpClient;
@@ -58,6 +68,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Base implementations with behavior common to all grant-types.
@@ -83,17 +94,20 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   protected final Map<String, String> customParametersExtractorsExprs;
   protected final Function<String, String> resourceOwnerIdTransformer;
 
+  private final SchedulerService schedulerService;
   private final LockFactory lockProvider;
   private final Map<String, ResourceOwnerOAuthContext> tokensStore;
   private final HttpClient httpClient;
   private final MuleExpressionLanguage expressionEvaluator;
+  private Scheduler pollScheduler;
 
   protected AbstractOAuthDancer(String name, String clientId, String clientSecret, String tokenUrl, Charset encoding,
                                 String scopes,
                                 ClientCredentialsLocation clientCredentialsLocation, String responseAccessTokenExpr,
                                 String responseRefreshTokenExpr, String responseExpiresInExpr,
                                 Map<String, String> customParametersExtractorsExprs,
-                                Function<String, String> resourceOwnerIdTransformer, LockFactory lockProvider,
+                                Function<String, String> resourceOwnerIdTransformer, SchedulerService schedulerService,
+                                LockFactory lockProvider,
                                 Map<String, ResourceOwnerOAuthContext> tokensStore, HttpClient httpClient,
                                 MuleExpressionLanguage expressionEvaluator) {
     this.name = name;
@@ -110,6 +124,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     this.customParametersExtractorsExprs = customParametersExtractorsExprs;
     this.resourceOwnerIdTransformer = resourceOwnerIdTransformer;
 
+    this.schedulerService = schedulerService;
     this.lockProvider = lockProvider;
     this.tokensStore = tokensStore;
     this.httpClient = httpClient;
@@ -119,16 +134,22 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   @Override
   public void start() throws MuleException {
     httpClient.start();
+    pollScheduler = schedulerService.ioScheduler(config()
+        .withName(name + "-oauthDancer-tokenRefreshPoll")
+        .withShutdownTimeout(0, MILLISECONDS));
   }
 
   @Override
   public void stop() throws MuleException {
+    if (pollScheduler != null) {
+      pollScheduler.stop();
+    }
     httpClient.stop();
   }
 
   /**
-   * Based on the value of {@code clientCredentialsLocation}, add the clientId and clientSecret values to the form or encode
-   * and return them.
+   * Based on the value of {@code clientCredentialsLocation}, add the clientId and clientSecret values to the form or encode and
+   * return them.
    *
    * @param formData
    */
@@ -141,6 +162,95 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
         formData.put(CLIENT_SECRET_PARAMETER, clientSecret);
     }
     return null;
+  }
+
+  /**
+   * Method for refreshing tokens in a thread-safe manner across nodes of a cluster.
+   */
+  protected CompletableFuture<Void> doRefreshToken(Supplier<ResourceOwnerOAuthContext> oauthContextSupplier,
+                                                   Function<ResourceOwnerOAuthContext, CompletableFuture<Void>> tokenRefreshRequester) {
+    ResourceOwnerOAuthContext oauthContext = oauthContextSupplier.get();
+
+    final Lock lock = oauthContext.getRefreshUserOAuthContextLock(name, getLockProvider());
+
+    // If the context was just created, initialize it.
+    if (oauthContext.getDancerState() == NO_TOKEN) {
+      if (lock.tryLock()) {
+        try {
+          oauthContext = oauthContextSupplier.get();
+          if (oauthContext.getDancerState() == HAS_TOKEN) {
+            // Some other thread/node completed the refresh before lock was acquired here. Very quickly and quite improbable, but
+            // possible.
+            return completedFuture(null);
+          } else if (oauthContext.getDancerState() == REFRESHING_TOKEN) {
+            return pollForRefreshComplete(oauthContextSupplier);
+          } else if (oauthContext.getDancerState() == NO_TOKEN) {
+            ((DefaultResourceOwnerOAuthContext) oauthContext).setDancerState(REFRESHING_TOKEN);
+            updateResourceOwnerOAuthContext(oauthContext);
+
+            return tokenRefreshRequester.apply(oauthContext);
+          }
+        } finally {
+          lock.unlock();
+        }
+      } else {
+        return pollForRefreshComplete(oauthContextSupplier);
+      }
+    }
+
+    // If there is a previous token, refresh it
+    if (oauthContext.getDancerState() == HAS_TOKEN) {
+      final String accessToken = oauthContext.getAccessToken();
+      lock.lock();
+      try {
+        oauthContext = oauthContextSupplier.get();
+        if (oauthContext.getDancerState() == HAS_TOKEN) {
+          if (accessToken.equals(oauthContext.getAccessToken())) {
+            ((DefaultResourceOwnerOAuthContext) oauthContext).setDancerState(REFRESHING_TOKEN);
+            updateResourceOwnerOAuthContext(oauthContext);
+
+            return tokenRefreshRequester.apply(oauthContext);
+          } else {
+            // Some other thread/node completed the refresh before lock was acquired here. Very quickly and quite improbable, but
+            // possible.
+            return completedFuture(null);
+          }
+        } else if (oauthContext.getDancerState() == REFRESHING_TOKEN) {
+          return pollForRefreshComplete(oauthContextSupplier);
+        } else if (oauthContext.getDancerState() == NO_TOKEN) {
+          ((DefaultResourceOwnerOAuthContext) oauthContext).setDancerState(REFRESHING_TOKEN);
+          updateResourceOwnerOAuthContext(oauthContext);
+
+          return tokenRefreshRequester.apply(oauthContext);
+        }
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    // In any other case, a refresh is being done elsewhere, so we poll for it
+    return pollForRefreshComplete(oauthContextSupplier);
+  }
+
+  private CompletableFuture<Void> pollForRefreshComplete(Supplier<ResourceOwnerOAuthContext> oauthContextSupplier) {
+    final CompletableFuture<Void> pendingResponse = new CompletableFuture<>();
+
+    pollScheduler.execute(() -> {
+      DefaultResourceOwnerOAuthContext ctx = (DefaultResourceOwnerOAuthContext) oauthContextSupplier.get();
+
+      while (ctx.getDancerState() == REFRESHING_TOKEN) {
+        try {
+          sleep(10);
+        } catch (InterruptedException e) {
+          currentThread().interrupt();
+          pendingResponse.completeExceptionally(e);
+        }
+        ctx = (DefaultResourceOwnerOAuthContext) oauthContextSupplier.get();
+      }
+      pendingResponse.complete(null);
+    });
+
+    return pendingResponse;
   }
 
   protected CompletableFuture<TokenResponse> invokeTokenUrl(String tokenUrl,
