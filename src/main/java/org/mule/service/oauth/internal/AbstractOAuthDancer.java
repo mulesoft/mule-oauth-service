@@ -384,7 +384,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   public void invalidateContext(String resourceOwner) {
     final Lock refreshUserOAuthContextLock =
         ((DefaultResourceOwnerOAuthContext) getContextForResourceOwner(resourceOwner))
-            .getRefreshUserOAuthContextLock(toString() + "-config-oauth-context", getLockProvider());
+            .getRefreshUserOAuthContextLock(name, getLockProvider());
     refreshUserOAuthContextLock.lock();
     try {
       tokensStore.remove(resourceOwnerIdTransformer.apply(resourceOwner));
@@ -409,7 +409,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
 
     ResourceOwnerOAuthContext resourceOwnerOAuthContext = null;
     if (!tokensStore.containsKey(transformedResourceOwnerId)) {
-      final Lock lock = createRefreshUserOAuthContextLock(toString(), lockProvider, resourceOwnerId);
+      final Lock lock = createRefreshUserOAuthContextLock(name, lockProvider, resourceOwnerId);
       lock.lock();
       try {
         if (!tokensStore.containsKey(transformedResourceOwnerId)) {
@@ -434,7 +434,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   protected void updateResourceOwnerOAuthContext(ResourceOwnerOAuthContext resourceOwnerOAuthContext) {
     final Lock resourceOwnerContextLock =
         ((DefaultResourceOwnerOAuthContext) resourceOwnerOAuthContext)
-            .getRefreshUserOAuthContextLock(toString() + "-config-oauth-context", getLockProvider());
+            .getRefreshUserOAuthContextLock(name, getLockProvider());
     resourceOwnerContextLock.lock();
     try {
       tokensStore.put(resourceOwnerIdTransformer.apply(resourceOwnerOAuthContext.getResourceOwnerId()),
