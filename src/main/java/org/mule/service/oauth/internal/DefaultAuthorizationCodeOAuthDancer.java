@@ -34,8 +34,6 @@ import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.NO_AUTHORI
 import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.TOKEN_NOT_FOUND_STATUS;
 import static org.mule.runtime.oauth.api.OAuthAuthorizationStatusCode.TOKEN_URL_CALL_FAILED_STATUS;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
-import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.HAS_TOKEN;
-import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.NO_TOKEN;
 import static org.mule.service.oauth.internal.OAuthConstants.CODE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_AUTHENTICATION_CODE;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_PARAMETER;
@@ -95,7 +93,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -568,20 +565,11 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
               LOGGER.debug("Update OAuth Context for resourceOwnerId %s", resourceOwnerOAuthContext.getResourceOwnerId());
             }
             updateResourceOwnerState(resourceOwnerOAuthContext, null, tokenResponse);
-            resourceOwnerOAuthContext.setDancerState(HAS_TOKEN);
-            updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
+            updateOAuthContextAfterTokenResponse(resourceOwnerOAuthContext);
             listeners.forEach(l -> l.onTokenRefreshed(resourceOwnerOAuthContext));
           });
         })
-        .exceptionally(t -> {
-          resourceOwnerOAuthContext.setDancerState(NO_TOKEN);
-          updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
-          if (t instanceof CompletionException) {
-            throw (CompletionException) t;
-          } else {
-            throw new CompletionException(t);
-          }
-        });
+        .exceptionally(tokenUrlExceptionHandler(resourceOwnerOAuthContext));
   }
 
   private void updateResourceOwnerState(DefaultResourceOwnerOAuthContext resourceOwnerOAuthContext, String newState,

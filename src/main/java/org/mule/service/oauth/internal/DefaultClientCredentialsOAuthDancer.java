@@ -11,8 +11,6 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 import static org.mule.runtime.api.util.Preconditions.checkArgument;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
-import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.HAS_TOKEN;
-import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.NO_TOKEN;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_CLIENT_CREDENTIALS;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.SCOPE_PARAMETER;
@@ -41,7 +39,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
@@ -160,22 +157,13 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
                                                                 customResponseParameterEntry.getValue());
             }
 
-            defaultUserState.setDancerState(HAS_TOKEN);
-            updateResourceOwnerOAuthContext(defaultUserState);
+            updateOAuthContextAfterTokenResponse(defaultUserState);
             if (notifyListeners) {
               listeners.forEach(l -> l.onTokenRefreshed(defaultUserState));
             }
           });
         })
-        .exceptionally(t -> {
-          defaultUserState.setDancerState(NO_TOKEN);
-          updateResourceOwnerOAuthContext(defaultUserState);
-          if (t instanceof CompletionException) {
-            throw (CompletionException) t;
-          } else {
-            throw new CompletionException(t);
-          }
-        });
+        .exceptionally(tokenUrlExceptionHandler(defaultUserState));
   }
 
   @Override
