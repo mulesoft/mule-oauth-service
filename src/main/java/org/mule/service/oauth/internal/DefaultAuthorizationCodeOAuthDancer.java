@@ -78,8 +78,8 @@ import org.mule.runtime.oauth.api.builder.ClientCredentialsLocation;
 import org.mule.runtime.oauth.api.exception.RequestAuthenticationException;
 import org.mule.runtime.oauth.api.exception.TokenNotFoundException;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
-import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
+import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContextWithRefreshState;
 import org.mule.service.oauth.internal.authorizationcode.AuthorizationRequestUrlBuilder;
 import org.mule.service.oauth.internal.authorizationcode.DefaultAuthorizationCodeRequest;
 import org.mule.service.oauth.internal.state.StateDecoder;
@@ -315,8 +315,8 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
                   return;
                 }
 
-                final DefaultResourceOwnerOAuthContext resourceOwnerOAuthContext =
-                    (DefaultResourceOwnerOAuthContext) getContextForResourceOwner(resourceOwnerId == null
+                final ResourceOwnerOAuthContextWithRefreshState resourceOwnerOAuthContext =
+                    (ResourceOwnerOAuthContextWithRefreshState) getContextForResourceOwner(resourceOwnerId == null
                         ? DEFAULT_RESOURCE_OWNER_ID
                         : resourceOwnerId);
 
@@ -529,11 +529,11 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
     }
 
     return doRefreshToken(() -> getContextForResourceOwner(resourceOwner),
-                          ctx -> doRefreshTokenRequest(useQueryParameters, (DefaultResourceOwnerOAuthContext) ctx));
+                          ctx -> doRefreshTokenRequest(useQueryParameters, (ResourceOwnerOAuthContextWithRefreshState) ctx));
   }
 
   protected CompletableFuture<Void> doRefreshTokenRequest(boolean useQueryParameters,
-                                                          final DefaultResourceOwnerOAuthContext resourceOwnerOAuthContext) {
+                                                          final ResourceOwnerOAuthContextWithRefreshState resourceOwnerOAuthContext) {
     final String userRefreshToken = resourceOwnerOAuthContext.getRefreshToken();
     if (userRefreshToken == null) {
       throw new MuleRuntimeException(createStaticMessage(
@@ -572,7 +572,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
         .exceptionally(tokenUrlExceptionHandler(resourceOwnerOAuthContext));
   }
 
-  private void updateResourceOwnerState(DefaultResourceOwnerOAuthContext resourceOwnerOAuthContext, String newState,
+  private void updateResourceOwnerState(ResourceOwnerOAuthContextWithRefreshState resourceOwnerOAuthContext, String newState,
                                         TokenResponse tokenResponse) {
     resourceOwnerOAuthContext.setAccessToken(tokenResponse.getAccessToken());
     if (tokenResponse.getRefreshToken() != null) {

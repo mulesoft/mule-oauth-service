@@ -30,8 +30,8 @@ import org.mule.runtime.oauth.api.builder.ClientCredentialsLocation;
 import org.mule.runtime.oauth.api.exception.RequestAuthenticationException;
 import org.mule.runtime.oauth.api.exception.TokenNotFoundException;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
-import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
+import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContextWithRefreshState;
 
 import java.nio.charset.Charset;
 import java.util.HashMap;
@@ -129,11 +129,11 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
 
   private CompletableFuture<Void> doRefreshTokenRequest(boolean notifyListeners) {
     return doRefreshToken(() -> getContext(),
-                          ctx -> doRefreshTokenRequest(notifyListeners, (DefaultResourceOwnerOAuthContext) ctx));
+                          ctx -> doRefreshTokenRequest(notifyListeners, (ResourceOwnerOAuthContextWithRefreshState) ctx));
   }
 
   private CompletableFuture<Void> doRefreshTokenRequest(boolean notifyListeners,
-                                                        DefaultResourceOwnerOAuthContext defaultUserState) {
+                                                        ResourceOwnerOAuthContextWithRefreshState defaultUserState) {
     final Map<String, String> formData = new HashMap<>();
 
     formData.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_CLIENT_CREDENTIALS);
