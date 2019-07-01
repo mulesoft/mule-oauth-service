@@ -7,12 +7,15 @@
 package org.mule.service.oauth.internal;
 
 import static java.lang.String.format;
+import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
 import static java.util.Collections.singletonMap;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static org.apache.commons.codec.binary.Base64.encodeBase64String;
+import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
 import static org.mule.runtime.api.metadata.DataType.STRING;
 import static org.mule.runtime.api.metadata.MediaType.ANY;
 import static org.mule.runtime.api.metadata.MediaType.parse;
@@ -25,10 +28,10 @@ import static org.mule.runtime.http.api.HttpHeaders.Names.CONTENT_TYPE;
 import static org.mule.runtime.http.api.HttpHeaders.Values.APPLICATION_X_WWW_FORM_URLENCODED;
 import static org.mule.runtime.http.api.utils.HttpEncoderDecoderUtils.encodeString;
 import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.QUERY_PARAMS;
+import static org.mule.runtime.oauth.api.state.DancerState.HAS_TOKEN;
+import static org.mule.runtime.oauth.api.state.DancerState.NO_TOKEN;
+import static org.mule.runtime.oauth.api.state.DancerState.REFRESHING_TOKEN;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
-import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.HAS_TOKEN;
-import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.NO_TOKEN;
-import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DancerState.REFRESHING_TOKEN;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContextWithRefreshState.createRefreshOAuthContextLock;
 import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_ID_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_SECRET_PARAMETER;
@@ -36,6 +39,7 @@ import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_SECRET_PARAM
 import org.mule.runtime.api.el.BindingContext;
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.MuleException;
+import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.lifecycle.Startable;
 import org.mule.runtime.api.lifecycle.Stoppable;
 import org.mule.runtime.api.lock.LockFactory;
@@ -193,18 +197,15 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
             // possible.
             return completedFuture(null);
           } else if (oauthContext.getDancerState() == REFRESHING_TOKEN) {
-            return pollForRefreshComplete(oauthContextSupplier);
+            return pollForRefreshComplete(oauthContextSupplier, oauthContext);
           } else if (oauthContext.getDancerState() == NO_TOKEN) {
-            oauthContext.setDancerState(REFRESHING_TOKEN);
-            updateResourceOwnerOAuthContext(oauthContext);
-
-            return tokenRefreshRequester.apply(oauthContext);
+            return doRefreshTokenRequest(tokenRefreshRequester, oauthContext);
           }
         } finally {
           lock.unlock();
         }
       } else {
-        return pollForRefreshComplete(oauthContextSupplier);
+        return pollForRefreshComplete(oauthContextSupplier, oauthContext);
       }
     }
 
@@ -216,22 +217,16 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
         oauthContext = oauthContextSupplier.get();
         if (oauthContext.getDancerState() == HAS_TOKEN) {
           if (accessToken.equals(oauthContext.getAccessToken())) {
-            oauthContext.setDancerState(REFRESHING_TOKEN);
-            updateResourceOwnerOAuthContext(oauthContext);
-
-            return tokenRefreshRequester.apply(oauthContext);
+            return doRefreshTokenRequest(tokenRefreshRequester, oauthContext);
           } else {
             // Some other thread/node completed the refresh before lock was acquired here. Very quickly and quite improbable, but
             // possible.
             return completedFuture(null);
           }
         } else if (oauthContext.getDancerState() == REFRESHING_TOKEN) {
-          return pollForRefreshComplete(oauthContextSupplier);
+          return pollForRefreshComplete(oauthContextSupplier, oauthContext);
         } else if (oauthContext.getDancerState() == NO_TOKEN) {
-          oauthContext.setDancerState(REFRESHING_TOKEN);
-          updateResourceOwnerOAuthContext(oauthContext);
-
-          return tokenRefreshRequester.apply(oauthContext);
+          return doRefreshTokenRequest(tokenRefreshRequester, oauthContext);
         }
       } finally {
         lock.unlock();
@@ -239,16 +234,44 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     }
 
     // In any other case, a refresh is being done elsewhere, so we poll for it
-    return pollForRefreshComplete(oauthContextSupplier);
+    return pollForRefreshComplete(oauthContextSupplier, oauthContext);
   }
 
-  private CompletableFuture<Void> pollForRefreshComplete(Supplier<ResourceOwnerOAuthContext> oauthContextSupplier) {
+  protected CompletableFuture<Void> doRefreshTokenRequest(Function<ResourceOwnerOAuthContext, CompletableFuture<Void>> tokenRefreshRequester,
+                                                          ResourceOwnerOAuthContext oauthContext) {
+    oauthContext.setDancerState(REFRESHING_TOKEN);
+    updateResourceOwnerOAuthContext(oauthContext);
+
+    try {
+      return tokenRefreshRequester.apply(oauthContext);
+    } catch (Exception e) {
+      // Exception is properly handled/logged by a caller. This is just for keeping the internal state of the contexts consistent.
+      oauthContext.setDancerState(NO_TOKEN);
+      updateResourceOwnerOAuthContext(oauthContext);
+      throw e;
+    }
+  }
+
+  private CompletableFuture<Void> pollForRefreshComplete(Supplier<ResourceOwnerOAuthContext> oauthContextSupplier,
+                                                         ResourceOwnerOAuthContext oauthContext) {
     final CompletableFuture<Void> pendingResponse = new CompletableFuture<>();
 
     pollScheduler.execute(() -> {
+      final long startNanos = nanoTime();
+
       ResourceOwnerOAuthContext ctx = oauthContextSupplier.get();
 
       while (ctx.getDancerState() == REFRESHING_TOKEN) {
+        if (NANOSECONDS.toMillis(nanoTime() - startNanos) > TOKEN_REQUEST_TIMEOUT_MILLIS) {
+          // Exception is properly handled/logged by a caller. This is just for keeping the internal state of the contexts
+          // consistent.
+          oauthContext.setDancerState(NO_TOKEN);
+          updateResourceOwnerOAuthContext(oauthContext);
+
+          pendingResponse
+              .completeExceptionally(new MuleRuntimeException(createStaticMessage("Timeout polling for token refresh to complete.")));
+        }
+
         try {
           sleep(100);
         } catch (InterruptedException e) {

@@ -15,6 +15,7 @@ import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.sameInstance;
 import static org.hamcrest.core.IsCollectionContaining.hasItem;
 import static org.hamcrest.text.IsEqualIgnoringCase.equalToIgnoringCase;
 import static org.junit.Assert.assertThat;
@@ -23,10 +24,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.mule.runtime.http.api.HttpHeaders.Names.AUTHORIZATION;
 import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.BASIC_AUTH_HEADER;
 import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.BODY;
 import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.QUERY_PARAMS;
+import static org.mule.runtime.oauth.api.state.DancerState.NO_TOKEN;
 
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.util.MultiMap;
@@ -34,6 +37,7 @@ import org.mule.runtime.http.api.client.HttpRequestOptions;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
 import org.mule.runtime.oauth.api.ClientCredentialsOAuthDancer;
 import org.mule.runtime.oauth.api.builder.OAuthClientCredentialsDancerBuilder;
+import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContextWithRefreshState;
 import org.mule.test.oauth.AbstractOAuthTestCase;
 
 import java.net.URI;
@@ -48,7 +52,9 @@ import java.util.concurrent.Future;
 import java.util.stream.Stream;
 
 import org.apache.commons.io.IOUtils;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
 
@@ -61,6 +67,9 @@ public class ClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
   private static final String OPEN_SESAME = "openSesame";
   private static final String CLIENT_ID = "client_id";
   private static final String CLIENT_SECRET = "client_secret";
+
+  @Rule
+  public ExpectedException expected = ExpectedException.none();
 
   @Test
   public void refreshTokenAfterInvalidate() throws Exception {
@@ -315,4 +324,22 @@ public class ClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
     assertThat(request.getHeaders().getAll(daenerys), containsInAnyOrder(daenerysValues));
     assertThat(request.getHeaders().getAll(jonSnow), containsInAnyOrder(snowValues));
   }
+
+  @Test
+  public void exeptionOnTokenRequest() throws Exception {
+    final IllegalStateException thrown = new IllegalStateException();
+    when(httpClient.sendAsync(any(), any())).thenThrow(thrown);
+
+    final Map<String, ResourceOwnerOAuthContextWithRefreshState> tokensStore = new HashMap<>();
+    final OAuthClientCredentialsDancerBuilder builder = baseClientCredentialsDancerBuilder(tokensStore);
+    builder.tokenUrl("http://host/token");
+
+    expected.expect(sameInstance(thrown));
+    try {
+      ClientCredentialsOAuthDancer minimalDancer = startDancer(builder);
+    } finally {
+      assertThat(tokensStore.get("default").getDancerState(), is(NO_TOKEN));
+    }
+  }
+
 }

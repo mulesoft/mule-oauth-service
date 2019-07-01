@@ -13,9 +13,9 @@ import static java.util.Optional.empty;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
-import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.rules.ExpectedException.none;
 import static org.mockito.ArgumentCaptor.forClass;
@@ -30,6 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.stopIfNeeded;
 import static org.mule.runtime.http.api.HttpConstants.Method.GET;
+import static org.mule.runtime.oauth.api.state.DancerState.NO_TOKEN;
 import static org.mule.service.oauth.internal.OAuthConstants.CODE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.STATE_PARAMETER;
 import static org.mule.service.oauth.internal.state.StateEncoder.RESOURCE_OWNER_PARAM_NAME_ASSIGN;
@@ -107,7 +108,8 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
 
   @Test
   public void clientCredentialsTokenUrlFailsDuringAppStartup() throws Exception {
-    final OAuthClientCredentialsDancerBuilder builder = baseClientCredentialsDancerBuilder();
+    final Map<String, ResourceOwnerOAuthContextWithRefreshState> tokensStore = new HashMap<>();
+    final OAuthClientCredentialsDancerBuilder builder = baseClientCredentialsDancerBuilder(tokensStore);
     builder.tokenUrl("http://host/token");
 
     reset(httpClient);
@@ -119,6 +121,8 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
 
     expected.expectCause(instanceOf(TokenUrlResponseException.class));
     minimalDancer.accessToken().get();
+
+    assertThat(tokensStore.get("default").getDancerState(), is(NO_TOKEN));
   }
 
   @Test
