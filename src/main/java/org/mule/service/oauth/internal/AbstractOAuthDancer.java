@@ -28,13 +28,19 @@ import static org.mule.runtime.http.api.HttpHeaders.Names.CONTENT_TYPE;
 import static org.mule.runtime.http.api.HttpHeaders.Values.APPLICATION_X_WWW_FORM_URLENCODED;
 import static org.mule.runtime.http.api.utils.HttpEncoderDecoderUtils.encodeString;
 import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.QUERY_PARAMS;
-import static org.mule.runtime.oauth.api.state.DancerState.HAS_TOKEN;
-import static org.mule.runtime.oauth.api.state.DancerState.NO_TOKEN;
-import static org.mule.runtime.oauth.api.state.DancerState.REFRESHING_TOKEN;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
-import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContextWithRefreshState.createRefreshOAuthContextLock;
 import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_ID_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_SECRET_PARAMETER;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.createRefreshUserOAuthContextLock;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.createResourceOwnerOAuthContext;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.getRefreshUserOAuthContextLock;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.isDancerStateHasToken;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.isDancerStateNoToken;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.isDancerStateRefreshingToken;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.migrateContextIfNeeded;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.setDancerStateHasToken;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.setDancerStateNoToken;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.setDancerStateRefreshingToken;
 
 import org.mule.runtime.api.el.BindingContext;
 import org.mule.runtime.api.el.MuleExpressionLanguage;
@@ -60,7 +66,6 @@ import org.mule.runtime.oauth.api.exception.TokenNotFoundException;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
 import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
-import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContextWithRefreshState;
 import org.mule.service.oauth.internal.state.TokenResponse;
 
 import java.io.IOException;
@@ -185,20 +190,20 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
                                                    Function<ResourceOwnerOAuthContext, CompletableFuture<Void>> tokenRefreshRequester) {
     ResourceOwnerOAuthContext oauthContext = oauthContextSupplier.get();
 
-    final Lock lock = oauthContext.getRefreshOAuthContextLock(name, getLockProvider());
+    final Lock lock = getRefreshUserOAuthContextLock(oauthContext, name, getLockProvider());
 
     // If the context was just created, initialize it.
-    if (oauthContext.getDancerState() == NO_TOKEN) {
+    if (isDancerStateNoToken(oauthContext)) {
       if (lock.tryLock()) {
         try {
           oauthContext = oauthContextSupplier.get();
-          if (oauthContext.getDancerState() == HAS_TOKEN) {
+          if (isDancerStateHasToken(oauthContext)) {
             // Some other thread/node completed the refresh before lock was acquired here. Very quickly and quite improbable, but
             // possible.
             return completedFuture(null);
-          } else if (oauthContext.getDancerState() == REFRESHING_TOKEN) {
+          } else if (isDancerStateRefreshingToken(oauthContext)) {
             return pollForRefreshComplete(oauthContextSupplier, oauthContext);
-          } else if (oauthContext.getDancerState() == NO_TOKEN) {
+          } else if (isDancerStateNoToken(oauthContext)) {
             return doRefreshTokenRequest(tokenRefreshRequester, oauthContext);
           }
         } finally {
@@ -210,12 +215,12 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     }
 
     // If there is a previous token, refresh it
-    if (oauthContext.getDancerState() == HAS_TOKEN) {
+    if (isDancerStateHasToken(oauthContext)) {
       final String accessToken = oauthContext.getAccessToken();
       lock.lock();
       try {
         oauthContext = oauthContextSupplier.get();
-        if (oauthContext.getDancerState() == HAS_TOKEN) {
+        if (isDancerStateHasToken(oauthContext)) {
           if (accessToken.equals(oauthContext.getAccessToken())) {
             return doRefreshTokenRequest(tokenRefreshRequester, oauthContext);
           } else {
@@ -223,9 +228,9 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
             // possible.
             return completedFuture(null);
           }
-        } else if (oauthContext.getDancerState() == REFRESHING_TOKEN) {
+        } else if (isDancerStateRefreshingToken(oauthContext)) {
           return pollForRefreshComplete(oauthContextSupplier, oauthContext);
-        } else if (oauthContext.getDancerState() == NO_TOKEN) {
+        } else if (isDancerStateNoToken(oauthContext)) {
           return doRefreshTokenRequest(tokenRefreshRequester, oauthContext);
         }
       } finally {
@@ -239,14 +244,22 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
 
   protected CompletableFuture<Void> doRefreshTokenRequest(Function<ResourceOwnerOAuthContext, CompletableFuture<Void>> tokenRefreshRequester,
                                                           ResourceOwnerOAuthContext oauthContext) {
-    oauthContext.setDancerState(REFRESHING_TOKEN);
+    final CompletableFuture<Void> refreshingFuture = new CompletableFuture<>();
+    setDancerStateRefreshingToken(oauthContext, refreshingFuture);
     updateResourceOwnerOAuthContext(oauthContext);
 
     try {
-      return tokenRefreshRequester.apply(oauthContext);
+      return tokenRefreshRequester.apply(oauthContext)
+          .whenComplete((v, t) -> {
+            if (t == null) {
+              refreshingFuture.complete(v);
+            } else {
+              refreshingFuture.completeExceptionally(t);
+            }
+          });
     } catch (Exception e) {
       // Exception is properly handled/logged by a caller. This is just for keeping the internal state of the contexts consistent.
-      oauthContext.setDancerState(NO_TOKEN);
+      setDancerStateNoToken(oauthContext);
       updateResourceOwnerOAuthContext(oauthContext);
       throw e;
     }
@@ -261,11 +274,11 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
 
       ResourceOwnerOAuthContext ctx = oauthContextSupplier.get();
 
-      while (ctx.getDancerState() == REFRESHING_TOKEN) {
+      while (isDancerStateRefreshingToken(ctx)) {
         if (NANOSECONDS.toMillis(nanoTime() - startNanos) > TOKEN_REQUEST_TIMEOUT_MILLIS) {
           // Exception is properly handled/logged by a caller. This is just for keeping the internal state of the contexts
           // consistent.
-          oauthContext.setDancerState(NO_TOKEN);
+          setDancerStateNoToken(oauthContext);
           updateResourceOwnerOAuthContext(oauthContext);
 
           pendingResponse
@@ -366,13 +379,13 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   }
 
   protected void updateOAuthContextAfterTokenResponse(ResourceOwnerOAuthContext defaultUserState) {
-    defaultUserState.setDancerState(HAS_TOKEN);
+    setDancerStateHasToken(defaultUserState);
     updateResourceOwnerOAuthContext(defaultUserState);
   }
 
   protected Function<Throwable, ? extends Void> tokenUrlExceptionHandler(ResourceOwnerOAuthContext defaultUserState) {
     return t -> {
-      defaultUserState.setDancerState(NO_TOKEN);
+      setDancerStateNoToken(defaultUserState);
       updateResourceOwnerOAuthContext(defaultUserState);
       if (t instanceof CompletionException) {
         throw (CompletionException) t;
@@ -433,7 +446,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
 
   public void invalidateContext(String resourceOwner) {
     final Lock refreshUserOAuthContextLock =
-        getContextForResourceOwner(resourceOwner).getRefreshOAuthContextLock(name, getLockProvider());
+        getRefreshUserOAuthContextLock(getContextForResourceOwner(resourceOwner), resourceOwner, getLockProvider());
     refreshUserOAuthContextLock.lock();
     try {
       tokensStore.remove(resourceOwnerIdTransformer.apply(resourceOwner));
@@ -458,11 +471,11 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
 
     ResourceOwnerOAuthContext resourceOwnerOAuthContext = null;
     if (!tokensStore.containsKey(transformedResourceOwnerId)) {
-      final Lock lock = createRefreshOAuthContextLock(name, lockProvider, resourceOwnerId);
+      final Lock lock = createRefreshUserOAuthContextLock(name, lockProvider, resourceOwnerId);
       lock.lock();
       try {
         if (!tokensStore.containsKey(transformedResourceOwnerId)) {
-          resourceOwnerOAuthContext = new ResourceOwnerOAuthContextWithRefreshState(resourceOwnerId);
+          resourceOwnerOAuthContext = createResourceOwnerOAuthContext(lock, resourceOwnerId);
           tokensStore.put(transformedResourceOwnerId, resourceOwnerOAuthContext);
         }
       } finally {
@@ -472,7 +485,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     if (resourceOwnerOAuthContext == null) {
       resourceOwnerOAuthContext = tokensStore.get(transformedResourceOwnerId);
       if (resourceOwnerOAuthContext instanceof DefaultResourceOwnerOAuthContext) {
-        resourceOwnerOAuthContext = new ResourceOwnerOAuthContextWithRefreshState(resourceOwnerOAuthContext);
+        resourceOwnerOAuthContext = migrateContextIfNeeded(resourceOwnerOAuthContext, name, lockProvider);
       }
     }
     return resourceOwnerOAuthContext;
@@ -484,7 +497,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
    * @param resourceOwnerOAuthContext
    */
   protected void updateResourceOwnerOAuthContext(ResourceOwnerOAuthContext resourceOwnerOAuthContext) {
-    final Lock resourceOwnerContextLock = resourceOwnerOAuthContext.getRefreshOAuthContextLock(name, getLockProvider());
+    final Lock resourceOwnerContextLock = getRefreshUserOAuthContextLock(resourceOwnerOAuthContext, name, getLockProvider());
     resourceOwnerContextLock.lock();
     try {
       tokensStore.put(resourceOwnerIdTransformer.apply(resourceOwnerOAuthContext.getResourceOwnerId()),

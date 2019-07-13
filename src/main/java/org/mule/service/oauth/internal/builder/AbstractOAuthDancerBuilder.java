@@ -69,7 +69,9 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
     this.expressionEvaluator = expressionEvaluator;
   }
 
-  @Override
+  /**
+   * @Override
+   */
   public OAuthDancerBuilder<D> name(String name) {
     this.name = name;
     return this;

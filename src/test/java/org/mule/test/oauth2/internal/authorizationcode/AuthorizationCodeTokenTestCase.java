@@ -30,6 +30,8 @@ import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.BODY;
 import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.QUERY_PARAMS;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
 import static org.mule.service.oauth.internal.OAuthConstants.CODE_PARAMETER;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.createResourceOwnerOAuthContext;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.setRefreshToken;
 
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.exception.MuleException;
@@ -44,7 +46,6 @@ import org.mule.runtime.oauth.api.AuthorizationCodeOAuthDancer;
 import org.mule.runtime.oauth.api.builder.OAuthAuthorizationCodeDancerBuilder;
 import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
-import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContextWithRefreshState;
 import org.mule.test.oauth.AbstractOAuthTestCase;
 
 import java.util.Arrays;
@@ -83,9 +84,8 @@ public class AuthorizationCodeTokenTestCase extends AbstractOAuthTestCase {
           return context;
         })},
         {(Supplier<ResourceOwnerOAuthContext>) (() -> {
-          final ResourceOwnerOAuthContextWithRefreshState context =
-              new ResourceOwnerOAuthContextWithRefreshState(DEFAULT_RESOURCE_OWNER_ID);
-          context.setRefreshToken("refreshToken");
+          ResourceOwnerOAuthContext context = createResourceOwnerOAuthContext(new ReentrantLock(), DEFAULT_RESOURCE_OWNER_ID);
+          setRefreshToken(context, "refreshToken");
           return context;
         })}
     });

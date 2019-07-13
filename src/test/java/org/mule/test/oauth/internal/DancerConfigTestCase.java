@@ -14,9 +14,11 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assume.assumeThat;
 import static org.junit.rules.ExpectedException.none;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
@@ -30,9 +32,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.stopIfNeeded;
 import static org.mule.runtime.http.api.HttpConstants.Method.GET;
-import static org.mule.runtime.oauth.api.state.DancerState.NO_TOKEN;
 import static org.mule.service.oauth.internal.OAuthConstants.CODE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.STATE_PARAMETER;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.createResourceOwnerOAuthContext;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.isDancerStateNoToken;
 import static org.mule.service.oauth.internal.state.StateEncoder.RESOURCE_OWNER_PARAM_NAME_ASSIGN;
 import static org.mule.tck.probe.PollingProber.probe;
 
@@ -55,7 +58,6 @@ import org.mule.runtime.oauth.api.builder.OAuthClientCredentialsDancerBuilder;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
 import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
-import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContextWithRefreshState;
 import org.mule.test.oauth.AbstractOAuthTestCase;
 
 import java.io.IOException;
@@ -108,7 +110,7 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
 
   @Test
   public void clientCredentialsTokenUrlFailsDuringAppStartup() throws Exception {
-    final Map<String, ResourceOwnerOAuthContextWithRefreshState> tokensStore = new HashMap<>();
+    final Map<String, ? extends ResourceOwnerOAuthContext> tokensStore = new HashMap<>();
     final OAuthClientCredentialsDancerBuilder builder = baseClientCredentialsDancerBuilder(tokensStore);
     builder.tokenUrl("http://host/token");
 
@@ -122,7 +124,7 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
     expected.expectCause(instanceOf(TokenUrlResponseException.class));
     minimalDancer.accessToken().get();
 
-    assertThat(tokensStore.get("default").getDancerState(), is(NO_TOKEN));
+    assertThat(isDancerStateNoToken(tokensStore.get("default")), is(true));
   }
 
   @Test
@@ -403,8 +405,8 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
     final AuthorizationCodeOAuthDancer dancer1 = startDancer(builder1);
     final AuthorizationCodeOAuthDancer dancer2 = startDancer(builder2);
 
-    final ResourceOwnerOAuthContext contextOwnerConn1 = new ResourceOwnerOAuthContextWithRefreshState("owner");
-    final ResourceOwnerOAuthContext contextOwnerConn2 = new ResourceOwnerOAuthContextWithRefreshState("owner");
+    final ResourceOwnerOAuthContext contextOwnerConn1 = createResourceOwnerOAuthContext(new ReentrantLock(), "owner");
+    final ResourceOwnerOAuthContext contextOwnerConn2 = createResourceOwnerOAuthContext(new ReentrantLock(), "owner");
     tokensStore.put("conn1-owner", contextOwnerConn1);
     tokensStore.put("conn2-owner", contextOwnerConn2);
 
@@ -415,6 +417,8 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
   @Test
   public void multipleDancersShareTokensStoreMigrateContext()
       throws MalformedURLException, InitialisationException, MuleException {
+    assumeThat(ctxWithStateClass, not(nullValue()));
+
     final Map<String, Object> tokensStore = new HashMap<>();
     final MuleExpressionLanguage el = mock(MuleExpressionLanguage.class);
 
@@ -441,10 +445,10 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
     tokensStore.put("conn2-owner", contextOwnerConn2);
 
     final ResourceOwnerOAuthContext ctx1 = dancer1.getContextForResourceOwner("owner1");
-    assertThat(ctx1, instanceOf(ResourceOwnerOAuthContextWithRefreshState.class));
+    assertThat(ctx1, instanceOf(ctxWithStateClass));
     assertThat(ctx1.getResourceOwnerId(), is("owner1"));
     final ResourceOwnerOAuthContext ctx2 = dancer2.getContextForResourceOwner("owner2");
-    assertThat(ctx2, instanceOf(ResourceOwnerOAuthContextWithRefreshState.class));
+    assertThat(ctx2, instanceOf(ctxWithStateClass));
     assertThat(ctx2.getResourceOwnerId(), is("owner2"));
   }
 

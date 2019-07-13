@@ -29,7 +29,7 @@ import static org.mule.runtime.http.api.HttpHeaders.Names.AUTHORIZATION;
 import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.BASIC_AUTH_HEADER;
 import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.BODY;
 import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.QUERY_PARAMS;
-import static org.mule.runtime.oauth.api.state.DancerState.NO_TOKEN;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.isDancerStateNoToken;
 
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.util.MultiMap;
@@ -37,7 +37,7 @@ import org.mule.runtime.http.api.client.HttpRequestOptions;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
 import org.mule.runtime.oauth.api.ClientCredentialsOAuthDancer;
 import org.mule.runtime.oauth.api.builder.OAuthClientCredentialsDancerBuilder;
-import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContextWithRefreshState;
+import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
 import org.mule.test.oauth.AbstractOAuthTestCase;
 
 import java.net.URI;
@@ -330,7 +330,7 @@ public class ClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
     final IllegalStateException thrown = new IllegalStateException();
     when(httpClient.sendAsync(any(), any())).thenThrow(thrown);
 
-    final Map<String, ResourceOwnerOAuthContextWithRefreshState> tokensStore = new HashMap<>();
+    final Map<String, ? extends ResourceOwnerOAuthContext> tokensStore = new HashMap<>();
     final OAuthClientCredentialsDancerBuilder builder = baseClientCredentialsDancerBuilder(tokensStore);
     builder.tokenUrl("http://host/token");
 
@@ -338,7 +338,7 @@ public class ClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
     try {
       ClientCredentialsOAuthDancer minimalDancer = startDancer(builder);
     } finally {
-      assertThat(tokensStore.get("default").getDancerState(), is(NO_TOKEN));
+      assertThat(isDancerStateNoToken(tokensStore.get("default")), is(true));
     }
   }
 

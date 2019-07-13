@@ -41,6 +41,10 @@ import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_REFRESH_
 import static org.mule.service.oauth.internal.OAuthConstants.REDIRECT_URI_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.REFRESH_TOKEN_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.STATE_PARAMETER;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.setAccessToken;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.setExpiresIn;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.setRefreshToken;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.setState;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.el.MuleExpressionLanguage;
@@ -79,7 +83,6 @@ import org.mule.runtime.oauth.api.exception.RequestAuthenticationException;
 import org.mule.runtime.oauth.api.exception.TokenNotFoundException;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
-import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContextWithRefreshState;
 import org.mule.service.oauth.internal.authorizationcode.AuthorizationRequestUrlBuilder;
 import org.mule.service.oauth.internal.authorizationcode.DefaultAuthorizationCodeRequest;
 import org.mule.service.oauth.internal.state.StateDecoder;
@@ -315,8 +318,8 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
                   return;
                 }
 
-                final ResourceOwnerOAuthContextWithRefreshState resourceOwnerOAuthContext =
-                    (ResourceOwnerOAuthContextWithRefreshState) getContextForResourceOwner(resourceOwnerId == null
+                final ResourceOwnerOAuthContext resourceOwnerOAuthContext =
+                    getContextForResourceOwner(resourceOwnerId == null
                         ? DEFAULT_RESOURCE_OWNER_ID
                         : resourceOwnerId);
 
@@ -529,11 +532,11 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
     }
 
     return doRefreshToken(() -> getContextForResourceOwner(resourceOwner),
-                          ctx -> doRefreshTokenRequest(useQueryParameters, (ResourceOwnerOAuthContextWithRefreshState) ctx));
+                          ctx -> doRefreshTokenRequest(useQueryParameters, ctx));
   }
 
   protected CompletableFuture<Void> doRefreshTokenRequest(boolean useQueryParameters,
-                                                          final ResourceOwnerOAuthContextWithRefreshState resourceOwnerOAuthContext) {
+                                                          final ResourceOwnerOAuthContext resourceOwnerOAuthContext) {
     final String userRefreshToken = resourceOwnerOAuthContext.getRefreshToken();
     if (userRefreshToken == null) {
       throw new MuleRuntimeException(createStaticMessage(
@@ -572,17 +575,17 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
         .exceptionally(tokenUrlExceptionHandler(resourceOwnerOAuthContext));
   }
 
-  private void updateResourceOwnerState(ResourceOwnerOAuthContextWithRefreshState resourceOwnerOAuthContext, String newState,
+  private void updateResourceOwnerState(ResourceOwnerOAuthContext resourceOwnerOAuthContext, String newState,
                                         TokenResponse tokenResponse) {
-    resourceOwnerOAuthContext.setAccessToken(tokenResponse.getAccessToken());
+    setAccessToken(resourceOwnerOAuthContext, tokenResponse.getAccessToken());
     if (tokenResponse.getRefreshToken() != null) {
-      resourceOwnerOAuthContext.setRefreshToken(tokenResponse.getRefreshToken());
+      setRefreshToken(resourceOwnerOAuthContext, tokenResponse.getRefreshToken());
     }
-    resourceOwnerOAuthContext.setExpiresIn(tokenResponse.getExpiresIn());
+    setExpiresIn(resourceOwnerOAuthContext, tokenResponse.getExpiresIn());
 
     // State may be null because there's no state or because this was called after refresh token.
     if (newState != null) {
-      resourceOwnerOAuthContext.setState(newState);
+      setState(resourceOwnerOAuthContext, newState);
     }
 
     final Map<String, Object> customResponseParameters = tokenResponse.getCustomResponseParameters();

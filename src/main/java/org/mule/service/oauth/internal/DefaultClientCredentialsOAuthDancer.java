@@ -14,6 +14,8 @@ import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_CLIENT_CREDENTIALS;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.SCOPE_PARAMETER;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.setAccessToken;
+import static org.mule.service.oauth.internal.ResourceOwnerOAuthContextUtils.setExpiresIn;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.el.MuleExpressionLanguage;
@@ -31,7 +33,6 @@ import org.mule.runtime.oauth.api.exception.RequestAuthenticationException;
 import org.mule.runtime.oauth.api.exception.TokenNotFoundException;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
-import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContextWithRefreshState;
 
 import java.nio.charset.Charset;
 import java.util.HashMap;
@@ -129,11 +130,11 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
 
   private CompletableFuture<Void> doRefreshTokenRequest(boolean notifyListeners) {
     return doRefreshToken(() -> getContext(),
-                          ctx -> doRefreshTokenRequest(notifyListeners, (ResourceOwnerOAuthContextWithRefreshState) ctx));
+                          ctx -> doRefreshTokenRequest(notifyListeners, ctx));
   }
 
   private CompletableFuture<Void> doRefreshTokenRequest(boolean notifyListeners,
-                                                        ResourceOwnerOAuthContextWithRefreshState defaultUserState) {
+                                                        ResourceOwnerOAuthContext defaultUserState) {
     final Map<String, String> formData = new HashMap<>();
 
     formData.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_CLIENT_CREDENTIALS);
@@ -150,8 +151,8 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
                            tokenResponse.getAccessToken(), tokenResponse.getRefreshToken(), tokenResponse.getExpiresIn());
             }
 
-            defaultUserState.setAccessToken(tokenResponse.getAccessToken());
-            defaultUserState.setExpiresIn(tokenResponse.getExpiresIn());
+            setAccessToken(defaultUserState, tokenResponse.getAccessToken());
+            setExpiresIn(defaultUserState, tokenResponse.getExpiresIn());
             for (Entry<String, Object> customResponseParameterEntry : tokenResponse.getCustomResponseParameters().entrySet()) {
               defaultUserState.getTokenResponseParameters().put(customResponseParameterEntry.getKey(),
                                                                 customResponseParameterEntry.getValue());

@@ -30,6 +30,7 @@ import org.mule.runtime.oauth.api.OAuthService;
 import org.mule.runtime.oauth.api.builder.OAuthAuthorizationCodeDancerBuilder;
 import org.mule.runtime.oauth.api.builder.OAuthClientCredentialsDancerBuilder;
 import org.mule.runtime.oauth.api.builder.OAuthDancerBuilder;
+import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
 import org.mule.service.oauth.internal.DefaultOAuthService;
 import org.mule.tck.SimpleUnitTestSupportSchedulerService;
 import org.mule.tck.junit4.AbstractMuleContextTestCase;
@@ -47,6 +48,19 @@ import org.junit.After;
 import org.junit.Before;
 
 public abstract class AbstractOAuthTestCase extends AbstractMuleContextTestCase {
+
+  protected static Class<? extends ResourceOwnerOAuthContext> ctxWithStateClass;
+
+  static {
+    try {
+      ctxWithStateClass = (Class<? extends ResourceOwnerOAuthContext>) Class
+          .forName("org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContextWithRefreshState");
+    } catch (ClassNotFoundException e) {
+      // Nothing to do, this is just using an older version of the api
+    } catch (SecurityException e) {
+      throw e;
+    }
+  }
 
   protected OAuthService service;
   protected HttpClientFactory httpClientFactory;
