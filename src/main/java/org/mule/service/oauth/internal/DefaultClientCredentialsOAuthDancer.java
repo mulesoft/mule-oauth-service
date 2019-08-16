@@ -13,6 +13,7 @@ import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_CLIENT_CREDENTIALS;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.SCOPE_PARAMETER;
+import static org.mule.service.oauth.internal.OAuthConstants.AUDIENCE_PARAMETER;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.el.MuleExpressionLanguage;
@@ -56,6 +57,7 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
   private boolean accessTokenRefreshedOnStart = false;
   private final MultiMap<String, String> customParameters;
   private final MultiMap<String, String> customHeaders;
+  private final String audience;
 
   public DefaultClientCredentialsOAuthDancer(String name, String clientId, String clientSecret, String tokenUrl, String scopes,
                                              ClientCredentialsLocation clientCredentialsLocation, Charset encoding,
@@ -67,13 +69,15 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
                                              MuleExpressionLanguage expressionEvaluator,
                                              MultiMap<String, String> customParameters,
                                              MultiMap<String, String> customHeaders,
-                                             List<ClientCredentialsListener> listeners) {
+                                             List<ClientCredentialsListener> listeners,
+                                             String audience) {
     super(name, clientId, clientSecret, tokenUrl, encoding, scopes, clientCredentialsLocation, responseAccessTokenExpr,
           responseRefreshTokenExpr, responseExpiresInExpr, customParametersExprs, resourceOwnerIdTransformer, schedulerService,
           lockProvider, tokensStore, httpClient, expressionEvaluator, listeners);
 
     this.customParameters = customParameters;
     this.customHeaders = customHeaders;
+    this.audience = audience;
   }
 
   @Override
@@ -129,6 +133,9 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
     formData.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_CLIENT_CREDENTIALS);
     if (scopes != null) {
       formData.put(SCOPE_PARAMETER, scopes);
+    }
+    if (audience != null) {
+      formData.put(AUDIENCE_PARAMETER, audience);
     }
     String authorization = handleClientCredentials(formData);
 

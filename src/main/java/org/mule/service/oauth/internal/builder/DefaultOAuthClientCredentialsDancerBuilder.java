@@ -37,6 +37,7 @@ public class DefaultOAuthClientCredentialsDancerBuilder extends AbstractOAuthDan
   private final List<ClientCredentialsListener> listeners = new LinkedList<>();
   private final MultiMap<String, String> customParameters = new MultiMap<>();
   private final MultiMap<String, String> customHeaders = new MultiMap<>();
+  private String audience;
 
 
   public DefaultOAuthClientCredentialsDancerBuilder(SchedulerService schedulerService, LockFactory lockProvider,
@@ -76,6 +77,12 @@ public class DefaultOAuthClientCredentialsDancerBuilder extends AbstractOAuthDan
   }
 
   @Override
+  public OAuthClientCredentialsDancerBuilder audience(String audience) {
+    this.audience = audience;
+    return this;
+  }
+
+  @Override
   public OAuthClientCredentialsDancerBuilder addListener(ClientCredentialsListener listener) {
     requireNonNull(listener, "Cannot add a null listener");
     listeners.add(listener);
@@ -94,7 +101,7 @@ public class DefaultOAuthClientCredentialsDancerBuilder extends AbstractOAuthDan
                                                    responseExpiresInExpr, customParametersExtractorsExprs,
                                                    resourceOwnerIdTransformer, schedulerService, lockProvider, tokensStore,
                                                    httpClientFactory.get(), expressionEvaluator, customParameters,
-                                                   customHeaders, listeners);
+                                                   customHeaders, listeners, audience);
   }
 
 }

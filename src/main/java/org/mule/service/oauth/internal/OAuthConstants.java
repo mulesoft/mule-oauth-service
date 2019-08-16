@@ -19,6 +19,7 @@ public final class OAuthConstants {
   public static final String REFRESH_TOKEN_PARAMETER = "refresh_token";
   public static final String STATE_PARAMETER = "state";
   public static final String SCOPE_PARAMETER = "scope";
+  public static final String AUDIENCE_PARAMETER = "audience";
 
   // Values
   public static final String GRANT_TYPE_AUTHENTICATION_CODE = "authorization_code";
