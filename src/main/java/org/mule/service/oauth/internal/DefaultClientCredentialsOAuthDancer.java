@@ -56,6 +56,7 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
   private boolean accessTokenRefreshedOnStart = false;
   private final MultiMap<String, String> customParameters;
   private final MultiMap<String, String> customHeaders;
+  private final MultiMap<String, String> customFormParameters;
 
   public DefaultClientCredentialsOAuthDancer(String name, String clientId, String clientSecret, String tokenUrl, String scopes,
                                              ClientCredentialsLocation clientCredentialsLocation, Charset encoding,
@@ -67,6 +68,7 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
                                              MuleExpressionLanguage expressionEvaluator,
                                              MultiMap<String, String> customParameters,
                                              MultiMap<String, String> customHeaders,
+                                             MultiMap<String, String> customFormParameters,
                                              List<ClientCredentialsListener> listeners) {
     super(name, clientId, clientSecret, tokenUrl, encoding, scopes, clientCredentialsLocation, responseAccessTokenExpr,
           responseRefreshTokenExpr, responseExpiresInExpr, customParametersExprs, resourceOwnerIdTransformer, schedulerService,
@@ -74,6 +76,7 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
 
     this.customParameters = customParameters;
     this.customHeaders = customHeaders;
+    this.customFormParameters = customFormParameters;
   }
 
   @Override
@@ -130,6 +133,11 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
     if (scopes != null) {
       formData.put(SCOPE_PARAMETER, scopes);
     }
+
+    for (Entry<String, String> entry : customFormParameters.entrySet()) {
+      formData.put(entry.getKey(), entry.getValue());
+    }
+
     String authorization = handleClientCredentials(formData);
 
     return invokeTokenUrl(tokenUrl, formData, customParameters, customHeaders, authorization, false, encoding)
