@@ -16,7 +16,6 @@
 
     <properties>
         <caffeineVersion>2.8.0</caffeineVersion>
-
         <formatterConfigPath>formatter.xml</formatterConfigPath>
     </properties>
 
