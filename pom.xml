@@ -7,7 +7,7 @@
         <version>1.3.0-SNAPSHOT</version>
     </parent>
 
-    <name>OAuth Service Implementation</name>
+    <name>OAuth Service Implementation</name> 
     <description>Provides OAuth authentication services</description>
 
     <artifactId>mule-service-oauth</artifactId>
