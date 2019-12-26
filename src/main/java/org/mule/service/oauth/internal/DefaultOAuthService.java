@@ -37,12 +37,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 
 
-public final class DefaultOAuthService implements OAuthService {
+public class DefaultOAuthService implements OAuthService {
 
-  private final HttpService httpService;
-  private final SchedulerService schedulerService;
-
-  private final LoadingCache<Pair<TlsContextFactory, ProxyConfig>, HttpClient> httpClientCache;
+  protected final HttpService httpService;
+  protected final SchedulerService schedulerService;
+  protected final LoadingCache<Pair<TlsContextFactory, ProxyConfig>, HttpClient> httpClientCache;
 
   public DefaultOAuthService(HttpService httpService, SchedulerService schedulerService) {
     this.httpService = httpService;
