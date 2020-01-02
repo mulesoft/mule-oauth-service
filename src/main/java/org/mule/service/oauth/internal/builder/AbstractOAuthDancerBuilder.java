@@ -14,21 +14,17 @@ import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.lock.LockFactory;
 import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.runtime.api.tls.TlsContextFactory;
+import org.mule.runtime.api.util.LazyValue;
 import org.mule.runtime.api.util.Pair;
 import org.mule.runtime.http.api.client.HttpClient;
-import org.mule.runtime.http.api.client.HttpRequestOptions;
 import org.mule.runtime.http.api.client.proxy.ProxyConfig;
-import org.mule.runtime.http.api.domain.message.request.HttpRequest;
-import org.mule.runtime.http.api.domain.message.response.HttpResponse;
 import org.mule.runtime.oauth.api.builder.ClientCredentialsLocation;
 import org.mule.runtime.oauth.api.builder.OAuthDancerBuilder;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
+import org.mule.service.oauth.internal.HttpClientWrapper;
 
-import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -103,30 +99,7 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
 
   @Override
   public OAuthDancerBuilder tokenUrl(HttpClient httpClient, String tokenUrl) {
-    this.httpClientFactory = () -> new HttpClient() {
-
-      @Override
-      public void stop() {
-        // Nothing to do. The lifecycle of this object is handled by whoever passed me the client.
-      }
-
-      @Override
-      public void start() {
-        // Nothing to do. The lifecycle of this object is handled by whoever passed me the client.
-      }
-
-      @Override
-      public CompletableFuture<HttpResponse> sendAsync(HttpRequest request, HttpRequestOptions options) {
-        return httpClient.sendAsync(request, options);
-      }
-
-      @Override
-      public HttpResponse send(HttpRequest request, HttpRequestOptions options)
-          throws IOException, TimeoutException {
-        return httpClient.send(request, options);
-      }
-    };
-
+    this.httpClientFactory = new LazyValue<>(new HttpClientWrapper(httpClient));
     this.tokenUrl = tokenUrl;
     return this;
   }
@@ -144,9 +117,7 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
   @Override
   public OAuthDancerBuilder<D> tokenUrl(String tokenUrl, TlsContextFactory tlsContextFactory, ProxyConfig proxyConfig) {
     this.tokenUrl = tokenUrl;
-    this.httpClientFactory = () -> {
-      return httpClientCache.get(new Pair(tlsContextFactory, proxyConfig));
-    };
+    this.httpClientFactory = () -> httpClientCache.get(new Pair(tlsContextFactory, proxyConfig));
     return this;
   }
 
@@ -191,5 +162,4 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
     this.resourceOwnerIdTransformer = resourceOwnerIdTransformer;
     return this;
   }
-
 }

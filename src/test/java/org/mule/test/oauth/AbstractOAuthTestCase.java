@@ -82,7 +82,7 @@ public abstract class AbstractOAuthTestCase extends AbstractMuleContextTestCase 
     when(httpServerFactory.create(any())).thenReturn(httpServer);
     when(httpService.getServerFactory()).thenReturn(httpServerFactory);
 
-    service = new DefaultOAuthService(httpService, new SimpleUnitTestSupportSchedulerService());
+    service = createOAuthService(httpService);
 
     final HttpResponse httpResponse = mock(HttpResponse.class);
     final InputStreamHttpEntity httpEntity = mock(InputStreamHttpEntity.class);
@@ -104,6 +104,10 @@ public abstract class AbstractOAuthTestCase extends AbstractMuleContextTestCase 
 
       return httpResponseFuture;
     });
+  }
+
+  protected DefaultOAuthService createOAuthService(HttpService httpService) {
+    return new DefaultOAuthService(httpService, new SimpleUnitTestSupportSchedulerService());
   }
 
   @After

@@ -58,6 +58,7 @@ import org.mule.runtime.http.api.client.HttpRequestOptions;
 import org.mule.runtime.http.api.domain.entity.ByteArrayHttpEntity;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
 import org.mule.runtime.http.api.domain.message.request.HttpRequestBuilder;
+import org.mule.runtime.http.api.domain.message.response.HttpResponse;
 import org.mule.runtime.oauth.api.builder.ClientCredentialsLocation;
 import org.mule.runtime.oauth.api.exception.TokenNotFoundException;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
@@ -94,7 +95,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractOAuthDancer.class);
 
-  private static final int TOKEN_REQUEST_TIMEOUT_MILLIS = 60000;
+  public static final int TOKEN_REQUEST_TIMEOUT_MILLIS = 60000;
 
   protected final String name;
 
@@ -210,8 +211,8 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   /**
    * Method for refreshing tokens in a thread-safe manner across nodes of a cluster.
    */
-  protected CompletableFuture<Void> doRefreshToken(Supplier<ResourceOwnerOAuthContext> oauthContextSupplier,
-                                                   Function<ResourceOwnerOAuthContext, CompletableFuture<Void>> tokenRefreshRequester) {
+  protected <T> CompletableFuture<T> doRefreshToken(Supplier<ResourceOwnerOAuthContext> oauthContextSupplier,
+                                                    Function<ResourceOwnerOAuthContext, CompletableFuture<T>> tokenRefreshRequester) {
     ResourceOwnerOAuthContext oauthContext = oauthContextSupplier.get();
 
     final Lock lock = oauthContext.getRefreshOAuthContextLock(name, getLockProvider());
@@ -266,8 +267,9 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     return pollForRefreshComplete(oauthContextSupplier, oauthContext);
   }
 
-  protected CompletableFuture<Void> doRefreshTokenRequest(Function<ResourceOwnerOAuthContext, CompletableFuture<Void>> tokenRefreshRequester,
-                                                          ResourceOwnerOAuthContext oauthContext) {
+  protected <T> CompletableFuture<T> doRefreshTokenRequest(
+                                                           Function<ResourceOwnerOAuthContext, CompletableFuture<T>> tokenRefreshRequester,
+                                                           ResourceOwnerOAuthContext oauthContext) {
     oauthContext.setDancerState(REFRESHING_TOKEN);
     updateResourceOwnerOAuthContext(oauthContext);
 
@@ -281,9 +283,9 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     }
   }
 
-  private CompletableFuture<Void> pollForRefreshComplete(Supplier<ResourceOwnerOAuthContext> oauthContextSupplier,
-                                                         ResourceOwnerOAuthContext oauthContext) {
-    final CompletableFuture<Void> pendingResponse = new CompletableFuture<>();
+  private <T> CompletableFuture<T> pollForRefreshComplete(Supplier<ResourceOwnerOAuthContext> oauthContextSupplier,
+                                                          ResourceOwnerOAuthContext oauthContext) {
+    final CompletableFuture<T> pendingResponse = new CompletableFuture<>();
 
     pollScheduler.execute(() -> {
       final long startNanos = nanoTime();
@@ -298,7 +300,8 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
           updateResourceOwnerOAuthContext(oauthContext);
 
           pendingResponse
-              .completeExceptionally(new MuleRuntimeException(createStaticMessage("Timeout polling for token refresh to complete.")));
+              .completeExceptionally(
+                                     new MuleRuntimeException(createStaticMessage("Timeout polling for token refresh to complete.")));
         }
 
         try {
@@ -348,50 +351,52 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
             }
           });
         })
-        .thenApply(response -> {
-          return withContextClassLoader(AbstractOAuthDancer.class.getClassLoader(), () -> {
-            String contentType = response.getHeaderValue(CONTENT_TYPE);
-            MediaType responseContentType = contentType != null ? parse(contentType) : ANY;
+        .thenApply(response -> parseTokenResponse(response, tokenUrl, retrieveRefreshToken));
+  }
 
-            String body;
-            try (InputStream content = response.getEntity().getContent()) {
-              body = IOUtils.toString(content);
+  protected TokenResponse parseTokenResponse(HttpResponse response, String tokenUrl, boolean retrieveRefreshToken) {
+    return withContextClassLoader(AbstractOAuthDancer.class.getClassLoader(), () -> {
+      String contentType = response.getHeaderValue(CONTENT_TYPE);
+      MediaType responseContentType = contentType != null ? parse(contentType) : ANY;
 
-              if (response.getStatusCode() >= BAD_REQUEST.getStatusCode()) {
-                try {
-                  throw new CompletionException(new TokenUrlResponseException(tokenUrl, response, body));
-                } catch (IOException e) {
-                  throw new CompletionException(new TokenUrlResponseException(tokenUrl, e));
-                }
-              }
-            }
+      String body;
+      try (InputStream content = response.getEntity().getContent()) {
+        body = IOUtils.toString(content);
 
-            MultiMap<String, String> responseHeaders = response.getHeaders();
+        if (response.getStatusCode() >= BAD_REQUEST.getStatusCode()) {
+          try {
+            throw new CompletionException(new TokenUrlResponseException(tokenUrl, response, body));
+          } catch (IOException e) {
+            throw new CompletionException(new TokenUrlResponseException(tokenUrl, e));
+          }
+        }
+      }
 
-            TokenResponse tokenResponse = new TokenResponse();
-            tokenResponse
-                .setAccessToken(resolveExpression(responseAccessTokenExpr, body, responseHeaders, responseContentType));
-            if (tokenResponse.getAccessToken() == null) {
-              throw new CompletionException(new TokenNotFoundException(tokenUrl, response, body));
-            }
-            if (retrieveRefreshToken) {
-              tokenResponse
-                  .setRefreshToken(resolveExpression(responseRefreshTokenExpr, body, responseHeaders, responseContentType));
-            }
-            tokenResponse.setExpiresIn(resolveExpression(responseExpiresInExpr, body, responseHeaders, responseContentType));
+      MultiMap<String, String> responseHeaders = response.getHeaders();
 
-            if (customParametersExtractorsExprs != null && !customParametersExtractorsExprs.isEmpty()) {
-              Map<String, Object> customParams = new HashMap<>();
-              for (Entry<String, String> customParamExpr : customParametersExtractorsExprs.entrySet()) {
-                customParams.put(customParamExpr.getKey(),
-                                 resolveExpression(customParamExpr.getValue(), body, responseHeaders, responseContentType));
-              }
-              tokenResponse.setCustomResponseParameters(customParams);
-            }
+      TokenResponse tokenResponse = new TokenResponse();
+      tokenResponse
+          .setAccessToken(resolveExpression(responseAccessTokenExpr, body, responseHeaders, responseContentType));
+      if (tokenResponse.getAccessToken() == null) {
+        throw new CompletionException(new TokenNotFoundException(tokenUrl, response, body));
+      }
+      if (retrieveRefreshToken) {
+        tokenResponse
+            .setRefreshToken(resolveExpression(responseRefreshTokenExpr, body, responseHeaders, responseContentType));
+      }
+      tokenResponse.setExpiresIn(resolveExpression(responseExpiresInExpr, body, responseHeaders, responseContentType));
 
-            return tokenResponse;
-          });
-        });
+      if (customParametersExtractorsExprs != null && !customParametersExtractorsExprs.isEmpty()) {
+        Map<String, Object> customParams = new HashMap<>();
+        for (Entry<String, String> customParamExpr : customParametersExtractorsExprs.entrySet()) {
+          customParams.put(customParamExpr.getKey(),
+                           resolveExpression(customParamExpr.getValue(), body, responseHeaders, responseContentType));
+        }
+        tokenResponse.setCustomResponseParameters(customParams);
+      }
+
+      return tokenResponse;
+    });
   }
 
   protected void updateOAuthContextAfterTokenResponse(ResourceOwnerOAuthContext defaultUserState) {
@@ -399,7 +404,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     updateResourceOwnerOAuthContext(defaultUserState);
   }
 
-  protected Function<Throwable, ? extends Void> tokenUrlExceptionHandler(ResourceOwnerOAuthContext defaultUserState) {
+  protected <T> Function<Throwable, ? extends T> tokenUrlExceptionHandler(ResourceOwnerOAuthContext defaultUserState) {
     return t -> {
       defaultUserState.setDancerState(NO_TOKEN);
       updateResourceOwnerOAuthContext(defaultUserState);

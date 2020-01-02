@@ -326,7 +326,7 @@ public class ClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
   }
 
   @Test
-  public void exeptionOnTokenRequest() throws Exception {
+  public void exceptionOnTokenRequest() throws Exception {
     final IllegalStateException thrown = new IllegalStateException();
     when(httpClient.sendAsync(any(), any())).thenThrow(thrown);
 
@@ -336,10 +336,9 @@ public class ClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
 
     expected.expect(sameInstance(thrown));
     try {
-      ClientCredentialsOAuthDancer minimalDancer = startDancer(builder);
+      startDancer(builder);
     } finally {
       assertThat(tokensStore.get("default").getDancerState(), is(NO_TOKEN));
     }
   }
-
 }
