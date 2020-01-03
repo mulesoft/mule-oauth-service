@@ -17,11 +17,11 @@ import org.mule.runtime.api.tls.TlsContextFactory;
 import org.mule.runtime.api.util.LazyValue;
 import org.mule.runtime.api.util.Pair;
 import org.mule.runtime.http.api.client.HttpClient;
+import org.mule.runtime.http.api.client.ManagedLifecycleHttpClient;
 import org.mule.runtime.http.api.client.proxy.ProxyConfig;
 import org.mule.runtime.oauth.api.builder.ClientCredentialsLocation;
 import org.mule.runtime.oauth.api.builder.OAuthDancerBuilder;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
-import org.mule.service.oauth.internal.HttpClientWrapper;
 
 import java.nio.charset.Charset;
 import java.util.Map;
@@ -99,7 +99,7 @@ public abstract class AbstractOAuthDancerBuilder<D> implements OAuthDancerBuilde
 
   @Override
   public OAuthDancerBuilder tokenUrl(HttpClient httpClient, String tokenUrl) {
-    this.httpClientFactory = new LazyValue<>(new HttpClientWrapper(httpClient));
+    this.httpClientFactory = new LazyValue<>(new ManagedLifecycleHttpClient(httpClient));
     this.tokenUrl = tokenUrl;
     return this;
   }
