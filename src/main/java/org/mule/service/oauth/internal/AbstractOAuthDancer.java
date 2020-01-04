@@ -37,6 +37,7 @@ import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContextWithRefreshState.createRefreshOAuthContextLock;
 import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_ID_PARAMETER;
 import static org.mule.service.oauth.internal.OAuthConstants.CLIENT_SECRET_PARAMETER;
+import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.el.BindingContext;
 import org.mule.runtime.api.el.MuleExpressionLanguage;
@@ -84,7 +85,6 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Base implementations with behavior common to all grant-types.
@@ -93,7 +93,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class AbstractOAuthDancer implements Startable, Stoppable {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(AbstractOAuthDancer.class);
+  private static final Logger LOGGER = getLogger(AbstractOAuthDancer.class);
 
   public static final int TOKEN_REQUEST_TIMEOUT_MILLIS = 60000;
 
@@ -173,10 +173,14 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
 
   @Override
   public void start() throws MuleException {
-    httpClient.start();
+    startHttpClient();
     pollScheduler = schedulerService.ioScheduler(config()
         .withName(name + "-oauthDancer-tokenRefreshPoll")
         .withShutdownTimeout(0, MILLISECONDS));
+  }
+
+  protected void startHttpClient() {
+    httpClient.start();
   }
 
   @Override
@@ -188,6 +192,11 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     } catch (Throwable t) {
       LOGGER.warn("Found error trying to stop pollScheduler for dancer '" + name + "'. Execution will continue...", t);
     }
+
+    stopHttpClient();
+  }
+
+  protected void stopHttpClient() {
     httpClient.stop();
   }
 
