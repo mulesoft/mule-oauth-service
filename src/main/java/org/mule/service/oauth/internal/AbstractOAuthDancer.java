@@ -22,7 +22,7 @@ import static org.mule.runtime.api.metadata.MediaType.ANY;
 import static org.mule.runtime.api.metadata.MediaType.parse;
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
 import static org.mule.runtime.api.util.Preconditions.checkArgument;
-import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
+import static org.mule.runtime.core.api.util.ClassUtils.setContextClassLoader;
 import static org.mule.runtime.http.api.HttpConstants.HttpStatus.BAD_REQUEST;
 import static org.mule.runtime.http.api.HttpConstants.Method.POST;
 import static org.mule.runtime.http.api.HttpHeaders.Names.AUTHORIZATION;
@@ -352,19 +352,29 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
         .responseTimeout(TOKEN_REQUEST_TIMEOUT_MILLIS)
         .build())
         .exceptionally(t -> {
-          return withContextClassLoader(AbstractOAuthDancer.class.getClassLoader(), () -> {
+          Thread thread = Thread.currentThread();
+          ClassLoader currentClassLoader = thread.getContextClassLoader();
+          ClassLoader contextClassLoader = AbstractOAuthDancer.class.getClassLoader();
+          setContextClassLoader(thread, currentClassLoader, contextClassLoader);
+          try {
             if (t instanceof IOException) {
               throw new CompletionException(new TokenUrlResponseException(tokenUrl, (IOException) t));
             } else {
               throw new CompletionException(t);
             }
-          });
+          } finally {
+            setContextClassLoader(thread, contextClassLoader, currentClassLoader);
+          }
         })
         .thenApply(response -> parseTokenResponse(response, tokenUrl, retrieveRefreshToken));
   }
 
   protected TokenResponse parseTokenResponse(HttpResponse response, String tokenUrl, boolean retrieveRefreshToken) {
-    return withContextClassLoader(AbstractOAuthDancer.class.getClassLoader(), () -> {
+    Thread thread = Thread.currentThread();
+    ClassLoader currentClassLoader = thread.getContextClassLoader();
+    ClassLoader contextClassLoader = AbstractOAuthDancer.class.getClassLoader();
+    setContextClassLoader(thread, currentClassLoader, contextClassLoader);
+    try {
       String contentType = response.getHeaderValue(CONTENT_TYPE);
       MediaType responseContentType = contentType != null ? parse(contentType) : ANY;
 
@@ -379,6 +389,8 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
             throw new CompletionException(new TokenUrlResponseException(tokenUrl, e));
           }
         }
+      } catch (IOException e) {
+        throw new MuleRuntimeException(e);
       }
 
       MultiMap<String, String> responseHeaders = response.getHeaders();
@@ -405,7 +417,9 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
       }
 
       return tokenResponse;
-    });
+    } finally {
+      setContextClassLoader(thread, contextClassLoader, currentClassLoader);
+    }
   }
 
   protected void updateOAuthContextAfterTokenResponse(ResourceOwnerOAuthContext defaultUserState) {
