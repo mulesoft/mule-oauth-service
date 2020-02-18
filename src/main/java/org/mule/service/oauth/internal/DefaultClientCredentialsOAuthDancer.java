@@ -8,7 +8,7 @@ package org.mule.service.oauth.internal;
 
 import static java.lang.Thread.currentThread;
 import static java.util.concurrent.CompletableFuture.completedFuture;
-import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
+import static org.mule.runtime.core.api.util.ClassUtils.setContextClassLoader;
 import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_CLIENT_CREDENTIALS;
 import static org.mule.service.oauth.internal.OAuthConstants.GRANT_TYPE_PARAMETER;
@@ -133,7 +133,11 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
 
     return invokeTokenUrl(tokenUrl, formData, customParameters, customHeaders, authorization, false, encoding)
         .thenAccept(tokenResponse -> {
-          withContextClassLoader(DefaultClientCredentialsOAuthDancer.class.getClassLoader(), () -> {
+          Thread currentThread = currentThread();
+          ClassLoader originalClassLoader = currentThread.getContextClassLoader();
+          ClassLoader contextClassLoader = DefaultClientCredentialsOAuthDancer.class.getClassLoader();
+          setContextClassLoader(currentThread, originalClassLoader, contextClassLoader);
+          try {
             if (LOGGER.isDebugEnabled()) {
               LOGGER.debug("Retrieved access token, refresh token and expires from token url are: %s, %s, %s",
                            tokenResponse.getAccessToken(), tokenResponse.getRefreshToken(), tokenResponse.getExpiresIn());
@@ -150,9 +154,10 @@ public class DefaultClientCredentialsOAuthDancer extends AbstractOAuthDancer imp
             if (notifyListeners) {
               forEachListener(l -> l.onTokenRefreshed(defaultUserState));
             }
-          });
-        })
-        .exceptionally(tokenUrlExceptionHandler(defaultUserState));
+          } finally {
+            setContextClassLoader(currentThread, contextClassLoader, originalClassLoader);
+          }
+        }).exceptionally(tokenUrlExceptionHandler(defaultUserState));
   }
 
   @Override

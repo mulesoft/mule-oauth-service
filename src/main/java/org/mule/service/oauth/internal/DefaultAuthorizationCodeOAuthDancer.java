@@ -16,7 +16,7 @@ import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
 import static org.mule.runtime.api.metadata.MediaType.ANY;
 import static org.mule.runtime.api.metadata.MediaType.parse;
 import static org.mule.runtime.api.util.MultiMap.emptyMultiMap;
-import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
+import static org.mule.runtime.core.api.util.ClassUtils.setContextClassLoader;
 import static org.mule.runtime.core.api.util.StringUtils.isBlank;
 import static org.mule.runtime.http.api.HttpConstants.HttpStatus.BAD_REQUEST;
 import static org.mule.runtime.http.api.HttpConstants.HttpStatus.INTERNAL_SERVER_ERROR;
@@ -72,11 +72,11 @@ import org.mule.runtime.http.api.server.async.ResponseStatusCallback;
 import org.mule.runtime.oauth.api.AuthorizationCodeOAuthDancer;
 import org.mule.runtime.oauth.api.AuthorizationCodeRequest;
 import org.mule.runtime.oauth.api.builder.AuthorizationCodeDanceCallbackContext;
-import org.mule.runtime.oauth.api.listener.AuthorizationCodeListener;
 import org.mule.runtime.oauth.api.builder.ClientCredentialsLocation;
 import org.mule.runtime.oauth.api.exception.RequestAuthenticationException;
 import org.mule.runtime.oauth.api.exception.TokenNotFoundException;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
+import org.mule.runtime.oauth.api.listener.AuthorizationCodeListener;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContextWithRefreshState;
 import org.mule.service.oauth.internal.authorizationcode.AuthorizationRequestUrlBuilder;
@@ -192,14 +192,18 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
 
       @Override
       public void handleRequest(HttpRequestContext requestContext, HttpResponseReadyCallback responseCallback) {
-        withContextClassLoader(DefaultAuthorizationCodeOAuthDancer.class.getClassLoader(), () -> {
-          try {
-            callbackHandler.handleRequest(requestContext, responseCallback);
-          } catch (Exception e) {
-            LOGGER.error("Uncaught Exception on OAuth listener", e);
-            sendErrorResponse(INTERNAL_SERVER_ERROR, e.getMessage(), responseCallback);
-          }
-        });
+        Thread currentThread = currentThread();
+        ClassLoader originalClassLoader = currentThread.getContextClassLoader();
+        ClassLoader contextClassLoader = DefaultAuthorizationCodeOAuthDancer.class.getClassLoader();
+        setContextClassLoader(currentThread, originalClassLoader, contextClassLoader);
+        try {
+          callbackHandler.handleRequest(requestContext, responseCallback);
+        } catch (Exception e) {
+          LOGGER.error("Uncaught Exception on OAuth listener", e);
+          sendErrorResponse(INTERNAL_SERVER_ERROR, e.getMessage(), responseCallback);
+        } finally {
+          setContextClassLoader(currentThread, contextClassLoader, originalClassLoader);
+        }
       }
 
       @Override
@@ -214,24 +218,25 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
   private static void sendErrorResponse(final HttpConstants.HttpStatus status, String message,
                                         HttpResponseReadyCallback responseCallback) {
     responseCallback.responseReady(HttpResponse.builder()
-        .statusCode(status.getStatusCode())
-        .reasonPhrase(status.getReasonPhrase())
-        .entity(
-                message != null ? new ByteArrayHttpEntity(message.getBytes()) : new EmptyHttpEntity())
-        .addHeader(CONTENT_LENGTH, message != null ? valueOf(message.length()) : "0")
-        .build(), new ResponseStatusCallback() {
+                                       .statusCode(status.getStatusCode())
+                                       .reasonPhrase(status.getReasonPhrase())
+                                       .entity(
+                                           message != null ? new ByteArrayHttpEntity(message.getBytes()) : new EmptyHttpEntity())
+                                       .addHeader(CONTENT_LENGTH, message != null ? valueOf(message.length()) : "0")
+                                       .build(), new ResponseStatusCallback() {
 
-          @Override
-          public void responseSendFailure(Throwable exception) {
-            LOGGER.warn("Error while sending {} response {}", status.getStatusCode(), exception.getMessage());
-            if (LOGGER.isDebugEnabled()) {
-              LOGGER.debug("Exception thrown", exception);
-            }
-          }
+      @Override
+      public void responseSendFailure(Throwable exception) {
+        LOGGER.warn("Error while sending {} response {}", status.getStatusCode(), exception.getMessage());
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Exception thrown", exception);
+        }
+      }
 
-          @Override
-          public void responseSendSuccessfully() {}
-        });
+      @Override
+      public void responseSendSuccessfully() {
+      }
+    });
   }
 
   private RequestHandler createRedirectUrlListener() {
@@ -252,7 +257,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
 
         if (authorizationCode == null) {
           LOGGER.info("HTTP Request to redirect URL done by the OAuth provider does not contains a code query parameter. "
-              + "Code query parameter is required to get the access token.");
+                          + "Code query parameter is required to get the access token.");
           LOGGER.error("Could not extract authorization code from OAuth provider HTTP request done to the redirect URL");
 
           sendResponse(stateDecoder, responseCallback, BAD_REQUEST,
@@ -277,9 +282,13 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
         formData.put(GRANT_TYPE_PARAMETER, GRANT_TYPE_AUTHENTICATION_CODE);
         formData.put(REDIRECT_URI_PARAMETER, externalCallbackUrl);
 
+        ClassLoader contextClassLoader = DefaultAuthorizationCodeOAuthDancer.class.getClassLoader();
         invokeTokenUrl(tokenUrl, formData, emptyMultiMap(), emptyMultiMap(), authorization, true, encoding)
             .exceptionally(e -> {
-              withContextClassLoader(DefaultAuthorizationCodeOAuthDancer.class.getClassLoader(), () -> {
+              Thread currentThread = currentThread();
+              ClassLoader originalClassLoader = currentThread.getContextClassLoader();
+              setContextClassLoader(currentThread, originalClassLoader, contextClassLoader);
+              try {
                 if (e.getCause() instanceof TokenUrlResponseException) {
                   LOGGER.error(e.getMessage());
                   sendResponse(stateDecoder, responseCallback, INTERNAL_SERVER_ERROR,
@@ -296,37 +305,44 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
                   LOGGER.error("Uncaught Exception on OAuth listener", e);
                   sendErrorResponse(INTERNAL_SERVER_ERROR, e.getMessage(), responseCallback);
                 }
-              });
+              } finally {
+                setContextClassLoader(currentThread, contextClassLoader, originalClassLoader);
+              }
               return null;
             }).thenAccept(tokenResponse -> {
-              withContextClassLoader(DefaultAuthorizationCodeOAuthDancer.class.getClassLoader(), () -> {
-                if (tokenResponse == null) {
-                  // This is just for the case where an error was already handled
-                  return;
-                }
+          Thread currentThread = currentThread();
+          ClassLoader originalClassLoader = currentThread.getContextClassLoader();
+          setContextClassLoader(currentThread, originalClassLoader, contextClassLoader);
+          try {
+            if (tokenResponse == null) {
+              // This is just for the case where an error was already handled
+              return;
+            }
 
-                final ResourceOwnerOAuthContextWithRefreshState resourceOwnerOAuthContext =
-                    (ResourceOwnerOAuthContextWithRefreshState) getContextForResourceOwner(resourceOwnerId == null
-                        ? DEFAULT_RESOURCE_OWNER_ID
-                        : resourceOwnerId);
+            final ResourceOwnerOAuthContextWithRefreshState resourceOwnerOAuthContext =
+                (ResourceOwnerOAuthContextWithRefreshState) getContextForResourceOwner(resourceOwnerId == null
+                                                                                           ? DEFAULT_RESOURCE_OWNER_ID
+                                                                                           : resourceOwnerId);
 
-                if (LOGGER.isDebugEnabled()) {
-                  LOGGER.debug("Update OAuth Context for resourceOwnerId %s", resourceOwnerOAuthContext.getResourceOwnerId());
-                  LOGGER.debug("Retrieved access token, refresh token and expires from token url are: %s, %s, %s",
-                               tokenResponse.getAccessToken(), tokenResponse.getRefreshToken(),
-                               tokenResponse.getExpiresIn());
-                }
+            if (LOGGER.isDebugEnabled()) {
+              LOGGER.debug("Update OAuth Context for resourceOwnerId %s", resourceOwnerOAuthContext.getResourceOwnerId());
+              LOGGER.debug("Retrieved access token, refresh token and expires from token url are: %s, %s, %s",
+                           tokenResponse.getAccessToken(), tokenResponse.getRefreshToken(),
+                           tokenResponse.getExpiresIn());
+            }
 
-                updateResourceOwnerState(resourceOwnerOAuthContext, stateDecoder.decodeOriginalState(), tokenResponse);
-                updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
+            updateResourceOwnerState(resourceOwnerOAuthContext, stateDecoder.decodeOriginalState(), tokenResponse);
+            updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
 
-                forEachListener(l -> l.onAuthorizationCompleted(resourceOwnerOAuthContext));
-                afterDanceCallback.accept(beforeCallbackContext, resourceOwnerOAuthContext);
+            forEachListener(l -> l.onAuthorizationCompleted(resourceOwnerOAuthContext));
+            afterDanceCallback.accept(beforeCallbackContext, resourceOwnerOAuthContext);
 
-                sendResponse(stateDecoder, responseCallback, OK, "Successfully retrieved access token",
-                             AUTHORIZATION_CODE_RECEIVED_STATUS);
-              });
-            });
+            sendResponse(stateDecoder, responseCallback, OK, "Successfully retrieved access token",
+                         AUTHORIZATION_CODE_RECEIVED_STATUS);
+          } finally {
+            setContextClassLoader(currentThread, contextClassLoader, originalClassLoader);
+          }
+        });
       }
 
       @Override
@@ -368,7 +384,8 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
       }
 
       @Override
-      public void responseSendSuccessfully() {}
+      public void responseSendSuccessfully() {
+      }
     });
   }
 
@@ -389,7 +406,8 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
       }
 
       @Override
-      public void responseSendSuccessfully() {}
+      public void responseSendSuccessfully() {
+      }
     });
   }
 
@@ -500,7 +518,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
     final String accessToken = getContextForResourceOwner(resourceOwner).getAccessToken();
     if (accessToken == null) {
       throw new RequestAuthenticationException(createStaticMessage(format("No access token found. "
-          + "Verify that you have authenticated before trying to execute an operation to the API.")));
+                                                                              + "Verify that you have authenticated before trying to execute an operation to the API.")));
     }
 
     // TODO MULE-11858 proactively refresh if the token has already expired based on its 'expiresIn' parameter
@@ -527,8 +545,8 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
     final String userRefreshToken = resourceOwnerOAuthContext.getRefreshToken();
     if (userRefreshToken == null) {
       throw new MuleRuntimeException(createStaticMessage(
-                                                         "The user with user id %s has no refresh token in his OAuth state so we can't execute the refresh token call",
-                                                         resourceOwnerOAuthContext.getResourceOwnerId()));
+          "The user with user id %s has no refresh token in his OAuth state so we can't execute the refresh token call",
+          resourceOwnerOAuthContext.getResourceOwnerId()));
     }
 
     final MultiMap<String, String> requestParameters = new MultiMap<>();
@@ -550,14 +568,20 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
 
     return invokeTokenUrl(tokenUrl, formData, queryParams, emptyMultiMap(), authorization, true, encoding)
         .thenAccept(tokenResponse -> {
-          withContextClassLoader(DefaultAuthorizationCodeOAuthDancer.class.getClassLoader(), () -> {
+          Thread currentThread = currentThread();
+          ClassLoader originalClassLoader = currentThread.getContextClassLoader();
+          ClassLoader contextClassLoader = DefaultAuthorizationCodeOAuthDancer.class.getClassLoader();
+          setContextClassLoader(currentThread, originalClassLoader, contextClassLoader);
+          try {
             if (LOGGER.isDebugEnabled()) {
               LOGGER.debug("Update OAuth Context for resourceOwnerId %s", resourceOwnerOAuthContext.getResourceOwnerId());
             }
             updateResourceOwnerState(resourceOwnerOAuthContext, null, tokenResponse);
             updateOAuthContextAfterTokenResponse(resourceOwnerOAuthContext);
             forEachListener(l -> l.onTokenRefreshed(resourceOwnerOAuthContext));
-          });
+          } finally {
+            setContextClassLoader(currentThread, contextClassLoader, contextClassLoader);
+          }
         })
         .exceptionally(tokenUrlExceptionHandler(resourceOwnerOAuthContext));
   }
