@@ -17,6 +17,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 import static org.junit.rules.ExpectedException.none;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
@@ -62,10 +63,15 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.commons.io.input.ReaderInputStream;
@@ -446,6 +452,81 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
     final ResourceOwnerOAuthContext ctx2 = dancer2.getContextForResourceOwner("owner2");
     assertThat(ctx2, instanceOf(ResourceOwnerOAuthContextWithRefreshState.class));
     assertThat(ctx2.getResourceOwnerId(), is("owner2"));
+  }
+
+  @Test
+  public void notNull() throws MalformedURLException, MuleException, InterruptedException {
+    final Map<String, Object> tokensStore = new HashMap<>();
+    final MuleExpressionLanguage el = mock(MuleExpressionLanguage.class);
+
+    final OAuthAuthorizationCodeDancerBuilder builder =
+        service.authorizationCodeGrantTypeDancerBuilder(lockFactory, tokensStore, el);
+    builder.clientCredentials("clientId", "clientSecret");
+    minimalAuthCodeConfig(builder);
+    final AuthorizationCodeOAuthDancer dancer = startDancer(builder);
+
+    final ResourceOwnerOAuthContext contextOwner = new DefaultResourceOwnerOAuthContext(new ReentrantLock(), "owner");
+    tokensStore.put("owner", contextOwner);
+
+    int removerThreadsCount = 150, getterThreadsCount = 170;
+    CountDownLatch threadsStartedLatch = new CountDownLatch(removerThreadsCount + getterThreadsCount);
+    Semaphore startProcessingSemaphore = new Semaphore(0);
+
+    List<Thread> runningThreads = new ArrayList<>();
+
+    AtomicInteger numberOfNulls = new AtomicInteger(0);
+
+    // spawn removers
+    for (int i = 0; i < removerThreadsCount; ++i) {
+      Thread removerThread = new Thread(() -> {
+        try {
+          threadsStartedLatch.countDown();
+          startProcessingSemaphore.acquire();
+
+          dancer.invalidateContext("owner");
+        } catch (InterruptedException e) {
+          fail("Remover thread was interrupted");
+        } catch (NullPointerException npe) {
+          numberOfNulls.incrementAndGet();
+        }
+      });
+      removerThread.start();
+      runningThreads.add(removerThread);
+    }
+
+    // spawn getters
+    for (int i = 0; i < getterThreadsCount; ++i) {
+      Thread getterThread = new Thread(() -> {
+        try {
+          threadsStartedLatch.countDown();
+          startProcessingSemaphore.acquire();
+
+          ResourceOwnerOAuthContext context = dancer.getContextForResourceOwner("owner");
+          if (context == null) {
+            numberOfNulls.incrementAndGet();
+          }
+        } catch (InterruptedException e) {
+          fail("Getter thread was interrupted");
+        } catch (NullPointerException npe) {
+          numberOfNulls.incrementAndGet();
+        }
+      });
+      getterThread.start();
+      runningThreads.add(getterThread);
+    }
+
+    // wait for all threads ready to process
+    threadsStartedLatch.await();
+
+    // signal the threads to start processing
+    startProcessingSemaphore.release(removerThreadsCount + getterThreadsCount);
+
+    // wait for threads completion
+    for (Thread thread : runningThreads) {
+      thread.join();
+    }
+
+    assertThat(numberOfNulls.get(), is(0));
   }
 
   private void configureRequestHandler(String resourceOwner, String state) {
