@@ -455,7 +455,8 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
   }
 
   @Test
-  public void notNull() throws MalformedURLException, MuleException, InterruptedException {
+  public void dancerDoesNotReturnNullValuesWhenGettingAndRemovingContextsConcurrently()
+      throws MalformedURLException, MuleException, InterruptedException {
     final Map<String, Object> tokensStore = new HashMap<>();
     final MuleExpressionLanguage el = mock(MuleExpressionLanguage.class);
 
@@ -476,7 +477,7 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
 
     AtomicInteger numberOfNulls = new AtomicInteger(0);
 
-    // spawn removers
+    // Spawn removers.
     for (int i = 0; i < removerThreadsCount; ++i) {
       Thread removerThread = new Thread(() -> {
         try {
@@ -494,7 +495,7 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
       runningThreads.add(removerThread);
     }
 
-    // spawn getters
+    // Spawn getters.
     for (int i = 0; i < getterThreadsCount; ++i) {
       Thread getterThread = new Thread(() -> {
         try {
@@ -515,13 +516,13 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
       runningThreads.add(getterThread);
     }
 
-    // wait for all threads ready to process
+    // Wait for all threads to be ready to process.
     threadsStartedLatch.await();
 
-    // signal the threads to start processing
+    // Signal the threads to start processing.
     startProcessingSemaphore.release(removerThreadsCount + getterThreadsCount);
 
-    // wait for threads completion
+    // Wait for threads completion.
     for (Thread thread : runningThreads) {
       thread.join();
     }

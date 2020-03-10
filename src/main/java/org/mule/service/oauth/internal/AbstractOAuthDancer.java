@@ -500,25 +500,28 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
 
     final String transformedResourceOwnerId = resourceOwnerIdTransformer.apply(resourceOwnerId);
 
-    ResourceOwnerOAuthContext resourceOwnerOAuthContext = null;
-    if (!tokensStore.containsKey(transformedResourceOwnerId)) {
-      final Lock lock = createRefreshOAuthContextLock(name, lockProvider, resourceOwnerId);
-      lock.lock();
-      try {
-        if (!tokensStore.containsKey(transformedResourceOwnerId)) {
-          resourceOwnerOAuthContext = new ResourceOwnerOAuthContextWithRefreshState(resourceOwnerId);
-          tokensStore.put(transformedResourceOwnerId, resourceOwnerOAuthContext);
-        }
-      } finally {
-        lock.unlock();
-      }
-    }
-    if (resourceOwnerOAuthContext == null) {
-      resourceOwnerOAuthContext = tokensStore.get(transformedResourceOwnerId);
+    ResourceOwnerOAuthContext resourceOwnerOAuthContext = tokensStore.get(transformedResourceOwnerId);
+    if (resourceOwnerOAuthContext != null) {
       if (resourceOwnerOAuthContext instanceof DefaultResourceOwnerOAuthContext) {
-        resourceOwnerOAuthContext = new ResourceOwnerOAuthContextWithRefreshState(resourceOwnerOAuthContext);
+        return new ResourceOwnerOAuthContextWithRefreshState(resourceOwnerOAuthContext);
+      } else {
+        return resourceOwnerOAuthContext;
       }
     }
+
+    final Lock lock = createRefreshOAuthContextLock(name, lockProvider, resourceOwnerId);
+    lock.lock();
+    try {
+      if (!tokensStore.containsKey(transformedResourceOwnerId)) {
+        resourceOwnerOAuthContext = new ResourceOwnerOAuthContextWithRefreshState(resourceOwnerId);
+        tokensStore.put(transformedResourceOwnerId, resourceOwnerOAuthContext);
+      } else {
+        resourceOwnerOAuthContext = tokensStore.get(transformedResourceOwnerId);
+      }
+    } finally {
+      lock.unlock();
+    }
+
     return resourceOwnerOAuthContext;
   }
 
