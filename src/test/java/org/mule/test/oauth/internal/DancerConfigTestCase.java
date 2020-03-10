@@ -469,7 +469,8 @@ public class DancerConfigTestCase extends AbstractOAuthTestCase {
     final ResourceOwnerOAuthContext contextOwner = new DefaultResourceOwnerOAuthContext(new ReentrantLock(), "owner");
     tokensStore.put("owner", contextOwner);
 
-    int removerThreadsCount = 150, getterThreadsCount = 170;
+    int removerThreadsCount = 150;
+    int getterThreadsCount = 170;
     CountDownLatch threadsStartedLatch = new CountDownLatch(removerThreadsCount + getterThreadsCount);
     Semaphore startProcessingSemaphore = new Semaphore(0);
 
