@@ -18,6 +18,7 @@
         <caffeineVersion>2.8.0</caffeineVersion>
 
         <formatterConfigPath>formatter.xml</formatterConfigPath>
+        <muleOAuthClienVersion>1.0.0-SNAPSHOT</muleOAuthClienVersion>
     </properties>
 
     <scm>
@@ -72,6 +73,11 @@
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
             <version>${caffeineVersion}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mule.connectors</groupId>
+            <artifactId>mule-oauth-client</artifactId>
+            <version>${muleOAuthClienVersion}</version>
         </dependency>
 
         <dependency>
