@@ -18,7 +18,7 @@
         <caffeineVersion>2.8.0</caffeineVersion>
 
         <formatterConfigPath>formatter.xml</formatterConfigPath>
-        <!--<muleOAuthClientVersion>1.0.0-SNAPSHOT</muleOAuthClientVersion>-->
+        <muleOAuthClientVersion>0.8.0-SNAPSHOT</muleOAuthClientVersion>
     </properties>
 
     <scm>
@@ -54,6 +54,16 @@
         </plugins>
     </build>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.mule.connectors</groupId>
+                <artifactId>mule-oauth-client</artifactId>
+                <version>${muleOAuthClientVersion}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <dependency>
             <groupId>commons-codec</groupId>
@@ -69,18 +79,6 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
         </dependency>
-        <!--
-        <dependency>
-            <groupId>com.github.ben-manes.caffeine</groupId>
-            <artifactId>caffeine</artifactId>
-            <version>${caffeineVersion}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.mule.connectors</groupId>
-            <artifactId>mule-oauth-client</artifactId>
-            <version>${muleOAuthClientVersion}</version>
-        </dependency>
-        -->
         <dependency>
             <groupId>org.mule.runtime</groupId>
             <artifactId>mule-api</artifactId>
