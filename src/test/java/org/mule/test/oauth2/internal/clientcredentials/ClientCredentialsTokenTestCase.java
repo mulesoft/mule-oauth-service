@@ -29,7 +29,9 @@ import static org.mule.runtime.http.api.HttpHeaders.Names.AUTHORIZATION;
 import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.BASIC_AUTH_HEADER;
 import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.BODY;
 import static org.mule.runtime.oauth.api.builder.ClientCredentialsLocation.QUERY_PARAMS;
+import static org.mule.runtime.oauth.api.state.DancerState.HAS_TOKEN;
 import static org.mule.runtime.oauth.api.state.DancerState.NO_TOKEN;
+import static org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext.DEFAULT_RESOURCE_OWNER_ID;
 
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.util.MultiMap;
@@ -37,6 +39,7 @@ import org.mule.runtime.http.api.client.HttpRequestOptions;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
 import org.mule.runtime.oauth.api.ClientCredentialsOAuthDancer;
 import org.mule.runtime.oauth.api.builder.OAuthClientCredentialsDancerBuilder;
+import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContextWithRefreshState;
 import org.mule.test.oauth.AbstractOAuthTestCase;
 
@@ -339,6 +342,31 @@ public class ClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
       startDancer(builder);
     } finally {
       assertThat(tokensStore.get("default").getDancerState(), is(NO_TOKEN));
+      assertThat(tokensStore.get("default").getAccessToken(), is(nullValue()));
+    }
+  }
+
+  @Test
+  public void exceptionOnTokenRequestWithPreviouslyStoredToken() throws Exception {
+    final IllegalStateException thrown = new IllegalStateException();
+    when(httpClient.sendAsync(any(), any())).thenThrow(thrown);
+
+    final Map<String, ResourceOwnerOAuthContextWithRefreshState> tokensStore = new HashMap<>();
+    ResourceOwnerOAuthContextWithRefreshState previousState =
+        new ResourceOwnerOAuthContextWithRefreshState(DEFAULT_RESOURCE_OWNER_ID);
+    previousState.setAccessToken("PreviousToken");
+    previousState.setDancerState(HAS_TOKEN);
+    tokensStore.put(DEFAULT_RESOURCE_OWNER_ID, previousState);
+
+    final OAuthClientCredentialsDancerBuilder builder = baseClientCredentialsDancerBuilder(tokensStore);
+    builder.tokenUrl("http://host/token");
+
+    expected.expect(sameInstance(thrown));
+    try {
+      startDancer(builder);
+    } finally {
+      assertThat(tokensStore.get(DEFAULT_RESOURCE_OWNER_ID).getDancerState(), is(NO_TOKEN));
+      assertThat(tokensStore.get(DEFAULT_RESOURCE_OWNER_ID).getAccessToken(), is(nullValue()));
     }
   }
 }
