@@ -7,14 +7,12 @@
 package org.mule.service.oauth.internal;
 
 import static java.lang.String.format;
-import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonMap;
 import static org.apache.commons.codec.binary.Base64.encodeBase64String;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.mule.runtime.api.metadata.DataType.STRING;
 import static org.mule.runtime.api.metadata.MediaType.ANY;
 import static org.mule.runtime.api.metadata.MediaType.parse;
-import static org.mule.runtime.api.util.Preconditions.checkArgument;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.runtime.http.api.HttpConstants.HttpStatus.BAD_REQUEST;
 import static org.mule.runtime.http.api.HttpConstants.Method.POST;
@@ -37,14 +35,12 @@ import org.mule.runtime.api.metadata.MediaType;
 import org.mule.runtime.api.metadata.TypedValue;
 import org.mule.runtime.api.util.MultiMap;
 import org.mule.runtime.core.api.util.IOUtils;
-import org.mule.runtime.extension.api.connectivity.oauth.OAuthState;
 import org.mule.runtime.http.api.client.HttpClient;
 import org.mule.runtime.http.api.domain.entity.ByteArrayHttpEntity;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
 import org.mule.runtime.http.api.domain.message.request.HttpRequestBuilder;
 import org.mule.runtime.oauth.api.exception.TokenNotFoundException;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
-import org.mule.runtime.oauth.api.listener.OAuthStateListener;
 import org.mule.runtime.oauth.api.state.DefaultResourceOwnerOAuthContext;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
 import org.mule.service.oauth.internal.state.TokenResponse;
@@ -52,18 +48,12 @@ import org.mule.service.oauth.internal.state.TokenResponse;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.locks.Lock;
-import java.util.function.Consumer;
 import java.util.function.Function;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Base implementations with behavior common to all grant-types.
@@ -72,7 +62,6 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class AbstractOAuthDancer implements Startable, Stoppable {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(AbstractOAuthDancer.class);
   private static final int TOKEN_REQUEST_TIMEOUT_MILLIS = 60000;
 
   protected final String clientId;
@@ -88,7 +77,6 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   protected final Map<String, String> customParametersExtractorsExprs;
   protected final Function<String, String> resourceOwnerIdTransformer;
 
-  private final List<OAuthStateListener> listeners;
   private final LockFactory lockProvider;
   private final Map<String, DefaultResourceOwnerOAuthContext> tokensStore;
   private final HttpClient httpClient;
@@ -101,19 +89,6 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
                                 Function<String, String> resourceOwnerIdTransformer, LockFactory lockProvider,
                                 Map<String, DefaultResourceOwnerOAuthContext> tokensStore, HttpClient httpClient,
                                 MuleExpressionLanguage expressionEvaluator) {
-    this(clientId, clientSecret, tokenUrl, encoding, scopes, encodeClientCredentialsInBody, responseAccessTokenExpr,
-         responseRefreshTokenExpr, responseExpiresInExpr, customParametersExtractorsExprs, resourceOwnerIdTransformer,
-         lockProvider, tokensStore, httpClient, expressionEvaluator, emptyList());
-  }
-
-  protected AbstractOAuthDancer(String clientId, String clientSecret, String tokenUrl, Charset encoding, String scopes,
-                                boolean encodeClientCredentialsInBody, String responseAccessTokenExpr,
-                                String responseRefreshTokenExpr, String responseExpiresInExpr,
-                                Map<String, String> customParametersExtractorsExprs,
-                                Function<String, String> resourceOwnerIdTransformer, LockFactory lockProvider,
-                                Map<String, DefaultResourceOwnerOAuthContext> tokensStore, HttpClient httpClient,
-                                MuleExpressionLanguage expressionEvaluator,
-                                List<? extends OAuthStateListener> listeners) {
     this.clientId = clientId;
     this.clientSecret = clientSecret;
     this.tokenUrl = tokenUrl;
@@ -130,12 +105,6 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     this.tokensStore = tokensStore;
     this.httpClient = httpClient;
     this.expressionEvaluator = expressionEvaluator;
-
-    if (listeners != null) {
-      this.listeners = new CopyOnWriteArrayList<>(listeners);
-    } else {
-      this.listeners = new CopyOnWriteArrayList<>();
-    }
   }
 
   @Override
@@ -151,7 +120,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   /**
    * Based on the value of {@code encodeClientCredentialsInBody}, add the clientId and clientSecret values to the form or encode
    * and return them.
-   *
+   * 
    * @param formData
    * @param encodeClientCredentialsInBody
    * @return
@@ -285,7 +254,6 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     context.getRefreshUserOAuthContextLock().lock();
     try {
       tokensStore.remove(resourceOwnerIdTransformer.apply(resourceOwner));
-      onEachListener(OAuthStateListener::onTokenInvalidated);
     } finally {
       context.getRefreshUserOAuthContextLock().unlock();
     }
@@ -347,27 +315,4 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     }
   }
 
-  protected void doAddListener(OAuthStateListener listener) {
-    checkArgument(listener != null, "Cannot add a null listener");
-    listeners.add(listener);
-  }
-
-  protected void doRemoveListener(OAuthStateListener listener) {
-    checkArgument(listener != null, "Cannot remove a null listener");
-    listeners.remove(listener);
-  }
-
-  protected void onEachListener(Consumer<OAuthStateListener> action) {
-    listeners.forEach(listener -> {
-      try {
-        action.accept(listener);
-      } catch (Exception e) {
-        if (LOGGER.isErrorEnabled()) {
-          LOGGER.error(format("Exception found while invoking %s [%s] on OAuth dancer [%s]",
-                              OAuthState.class.getSimpleName(), this, listener),
-                       e);
-        }
-      }
-    });
-  }
 }
