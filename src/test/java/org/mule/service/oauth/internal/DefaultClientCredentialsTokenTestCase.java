@@ -19,9 +19,13 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mule.runtime.oauth.api.state.DancerState.HAS_TOKEN;
+import static org.mule.service.oauth.internal.AbstractOAuthDancer.MAX_ATTEMPTS_PROPERTY;
+import static org.mule.service.oauth.internal.AbstractOAuthDancer.RETRY_INTERVAL_PROPERTY;
 
+import org.junit.Rule;
 import org.mule.runtime.oauth.api.builder.OAuthClientCredentialsDancerBuilder;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
+import org.mule.tck.junit4.rule.SystemProperty;
 import org.mule.test.oauth.AbstractOAuthTestCase;
 
 import java.util.Collections;
@@ -41,13 +45,20 @@ import org.mockito.stubbing.Answer;
 
 public class DefaultClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
 
+  @Rule
+  public SystemProperty maxAttempts = new SystemProperty(MAX_ATTEMPTS_PROPERTY, "50");
+
+  @Rule
+  public SystemProperty retryInterval = new SystemProperty(RETRY_INTERVAL_PROPERTY, "1");
+
   @Test
   public void cloudhubIssue() throws Exception {
     final Map<String, Object> tokensStore = mock(Map.class);
-    final int iterations = 1000;
+    final int iterations = 500;
     final Random random = new Random();
 
     final ResourceOwnerOAuthContext resourceOwnerOAuthContext = mock(ResourceOwnerOAuthContext.class, RETURNS_DEEP_STUBS);
+    when(resourceOwnerOAuthContext.getAccessToken()).thenReturn("accessToken");
     when(resourceOwnerOAuthContext.getDancerState()).thenReturn(HAS_TOKEN);
     final Supplier<ResourceOwnerOAuthContext> oauthContextSupplier = mock(Supplier.class);
     when(oauthContextSupplier.get()).thenAnswer((Answer<ResourceOwnerOAuthContext>) invocation -> {

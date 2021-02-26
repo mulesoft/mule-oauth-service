@@ -6,6 +6,8 @@
  */
 package org.mule.service.oauth.internal;
 
+import static java.lang.Integer.getInteger;
+import static java.lang.Long.getLong;
 import static java.lang.String.format;
 import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
@@ -21,6 +23,7 @@ import static org.mule.runtime.api.metadata.DataType.STRING;
 import static org.mule.runtime.api.metadata.MediaType.ANY;
 import static org.mule.runtime.api.metadata.MediaType.parse;
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
+import static org.mule.runtime.api.util.MuleSystemProperties.SYSTEM_PROPERTY_PREFIX;
 import static org.mule.runtime.api.util.Preconditions.checkArgument;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.runtime.http.api.HttpConstants.HttpStatus.BAD_REQUEST;
@@ -96,6 +99,13 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   private static final Logger LOGGER = getLogger(AbstractOAuthDancer.class);
 
   public static final int TOKEN_REQUEST_TIMEOUT_MILLIS = 60000;
+  public static final String MAX_ATTEMPTS_PROPERTY = SYSTEM_PROPERTY_PREFIX + "oauth.get-context.max.attempts";
+  public static final String RETRY_INTERVAL_PROPERTY = SYSTEM_PROPERTY_PREFIX + "oauth.get-context.retry.interval";
+
+  private static final int MAX_ATTEMPTS = getInteger(MAX_ATTEMPTS_PROPERTY, 5);
+  private static final long RETRY_INTERVAL = getLong(RETRY_INTERVAL_PROPERTY, 100l);
+
+  public static final String ERROR_GETTING_TOKEN_MESSAGE = "Error getting OAuthContext";
 
   protected final String name;
 
@@ -222,7 +232,11 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
    */
   protected <T> CompletableFuture<T> doRefreshToken(Supplier<ResourceOwnerOAuthContext> oauthContextSupplier,
                                                     Function<ResourceOwnerOAuthContext, CompletableFuture<T>> tokenRefreshRequester) {
-    ResourceOwnerOAuthContext oauthContext = oauthContextSupplier.get();
+    ResourceOwnerOAuthContext oauthContext = resolveContext(oauthContextSupplier);
+
+    if (oauthContext == null) {
+      return exceptionally(new IllegalStateException(ERROR_GETTING_TOKEN_MESSAGE));
+    }
 
     final Lock lock = oauthContext.getRefreshOAuthContextLock(name, getLockProvider());
 
@@ -230,7 +244,11 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     if (oauthContext.getDancerState() == NO_TOKEN) {
       if (lock.tryLock()) {
         try {
-          oauthContext = oauthContextSupplier.get();
+          oauthContext = resolveContext(oauthContextSupplier);
+          if (oauthContext == null) {
+            return exceptionally(new IllegalStateException(ERROR_GETTING_TOKEN_MESSAGE));
+          }
+
           if (oauthContext.getDancerState() == HAS_TOKEN) {
             // Some other thread/node completed the refresh before lock was acquired here. Very quickly and quite improbable, but
             // possible.
@@ -253,7 +271,10 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
       final String accessToken = oauthContext.getAccessToken();
       lock.lock();
       try {
-        oauthContext = oauthContextSupplier.get();
+        oauthContext = resolveContext(oauthContextSupplier);
+        if (oauthContext == null) {
+          return exceptionally(new IllegalStateException(ERROR_GETTING_TOKEN_MESSAGE));
+        }
         if (oauthContext.getDancerState() == HAS_TOKEN) {
           if (accessToken.equals(oauthContext.getAccessToken())) {
             return doRefreshTokenRequest(tokenRefreshRequester, oauthContext);
@@ -274,6 +295,28 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
 
     // In any other case, a refresh is being done elsewhere, so we poll for it
     return pollForRefreshComplete(oauthContextSupplier, oauthContext);
+  }
+
+  private <T> CompletableFuture<T> exceptionally(Throwable t) {
+    CompletableFuture<T> cf = new CompletableFuture<>();
+    cf.completeExceptionally(t);
+    return cf;
+  }
+
+  private ResourceOwnerOAuthContext resolveContext(Supplier<ResourceOwnerOAuthContext> oauthContextSupplier) {
+    for (int i = 0; i < MAX_ATTEMPTS; i++) {
+      ResourceOwnerOAuthContext oauthContext = oauthContextSupplier.get();
+      if (oauthContext != null) {
+        return oauthContext;
+      }
+      LOGGER.debug("OAuthContext was null! retrying {}/{}...", i + 1, MAX_ATTEMPTS);
+      try {
+        MILLISECONDS.sleep(RETRY_INTERVAL);
+      } catch (InterruptedException e) {
+        return null;
+      }
+    }
+    return null;
   }
 
   protected <T> CompletableFuture<T> doRefreshTokenRequest(
@@ -299,7 +342,11 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     pollScheduler.execute(() -> {
       final long startNanos = nanoTime();
 
-      ResourceOwnerOAuthContext ctx = oauthContextSupplier.get();
+      ResourceOwnerOAuthContext ctx = resolveContext(oauthContextSupplier);
+      if (ctx == null) {
+        pendingResponse.completeExceptionally(new IllegalStateException(ERROR_GETTING_TOKEN_MESSAGE));
+        return;
+      }
 
       while (ctx.getDancerState() == REFRESHING_TOKEN) {
         if (NANOSECONDS.toMillis(nanoTime() - startNanos) > TOKEN_REQUEST_TIMEOUT_MILLIS) {
@@ -319,7 +366,11 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
           currentThread().interrupt();
           pendingResponse.completeExceptionally(e);
         }
-        ctx = oauthContextSupplier.get();
+        ctx = resolveContext(oauthContextSupplier);
+        if (ctx == null) {
+          pendingResponse.completeExceptionally(new IllegalStateException(ERROR_GETTING_TOKEN_MESSAGE));
+          return;
+        }
       }
       pendingResponse.complete(null);
     });
