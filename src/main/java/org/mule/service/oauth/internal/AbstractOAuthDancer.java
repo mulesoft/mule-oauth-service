@@ -304,7 +304,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
       if (oauthContext != null) {
         return oauthContext;
       }
-      LOGGER.debug("OAuthContext was null! retrying {}/{}...", i + 1, MAX_ATTEMPTS);
+      LOGGER.error("OAuthContext was null! retrying {}/{}...", i + 1, MAX_ATTEMPTS);
       try {
         MILLISECONDS.sleep(RETRY_INTERVAL);
       } catch (InterruptedException e) {
