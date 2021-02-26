@@ -6,17 +6,12 @@
  */
 package org.mule.test.oauth2.internal.clientcredentials;
 
-import static java.lang.Math.max;
-import static java.lang.Math.round;
-import static java.lang.Thread.sleep;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasKey;
-import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
@@ -26,9 +21,7 @@ import static org.hamcrest.text.IsEqualIgnoringCase.equalToIgnoringCase;
 import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -53,28 +46,22 @@ import org.mule.test.oauth.AbstractOAuthTestCase;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.Stream;
 
-import io.qameta.allure.Feature;
 import org.apache.commons.io.IOUtils;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
-import org.mockito.stubbing.Answer;
-import org.mockito.stubbing.OngoingStubbing;
+
+import io.qameta.allure.Feature;
 
 @Feature("OAuth Service")
 public class ClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
@@ -86,52 +73,6 @@ public class ClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
 
   @Rule
   public ExpectedException expected = ExpectedException.none();
-
-  @Test
-  public void cloudhubIssue() throws Exception {
-    final Map<String, Object> tokensStore = mock(Map.class);
-    final int iterations = 1000;
-    final Random random = new Random();
-
-    OngoingStubbing stubbing = when(tokensStore.get(anyString())).thenReturn(mock(ResourceOwnerOAuthContext.class));
-    for (int i = 0; i < iterations; i++) {
-      if (random.nextBoolean()) {
-        stubbing = stubbing.thenReturn(mock(ResourceOwnerOAuthContext.class));
-      } else {
-        stubbing.thenAnswer((Answer<Object>) invocation -> {
-          sleep(max(1, round(random.nextDouble() * iterations)));
-          return null;
-        });
-      }
-    }
-
-    final OAuthClientCredentialsDancerBuilder builder = baseClientCredentialsDancerBuilder(tokensStore);
-    builder.tokenUrl("http://host/token");
-    ClientCredentialsOAuthDancer minimalDancer = startDancer(builder);
-
-    List<Throwable> exceptions = Collections.synchronizedList(new LinkedList<>());
-    CountDownLatch latch = new CountDownLatch(iterations);
-    ExecutorService executorService = Executors.newFixedThreadPool(10);
-    try {
-      for (int i = 0; i < iterations; i++) {
-        executorService.submit(() -> {
-          try {
-            minimalDancer.accessToken().get();
-          } catch (Throwable t) {
-            exceptions.add(t);
-          } finally {
-            latch.countDown();
-          }
-        });
-
-        latch.await(1, MINUTES);
-        assertThat(exceptions, hasSize(0));
-      }
-    } finally {
-      executorService.shutdownNow();
-    }
-
-  }
 
   @Test
   public void refreshTokenAfterInvalidate() throws Exception {
