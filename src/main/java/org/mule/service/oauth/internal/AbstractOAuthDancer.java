@@ -26,6 +26,7 @@ import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
 import static org.mule.runtime.api.util.MuleSystemProperties.SYSTEM_PROPERTY_PREFIX;
 import static org.mule.runtime.api.util.Preconditions.checkArgument;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
+import static org.mule.runtime.core.internal.util.ConcurrencyUtils.exceptionallyCompleted;
 import static org.mule.runtime.http.api.HttpConstants.HttpStatus.BAD_REQUEST;
 import static org.mule.runtime.http.api.HttpConstants.Method.POST;
 import static org.mule.runtime.http.api.HttpHeaders.Names.AUTHORIZATION;
@@ -105,7 +106,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   private static final int MAX_ATTEMPTS = getInteger(MAX_ATTEMPTS_PROPERTY, 5);
   private static final long RETRY_INTERVAL = getLong(RETRY_INTERVAL_PROPERTY, 100l);
 
-  public static final String ERROR_GETTING_TOKEN_MESSAGE = "Error getting OAuthContext";
+  public static final String ERROR_GETTING_TOKEN_MESSAGE = "OAuthContext not available";
 
   protected final String name;
 
@@ -235,7 +236,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     ResourceOwnerOAuthContext oauthContext = resolveContext(oauthContextSupplier);
 
     if (oauthContext == null) {
-      return exceptionally(new IllegalStateException(ERROR_GETTING_TOKEN_MESSAGE));
+      return exceptionallyCompleted(new IllegalStateException(ERROR_GETTING_TOKEN_MESSAGE));
     }
 
     final Lock lock = oauthContext.getRefreshOAuthContextLock(name, getLockProvider());
@@ -246,7 +247,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
         try {
           oauthContext = resolveContext(oauthContextSupplier);
           if (oauthContext == null) {
-            return exceptionally(new IllegalStateException(ERROR_GETTING_TOKEN_MESSAGE));
+            return exceptionallyCompleted(new IllegalStateException(ERROR_GETTING_TOKEN_MESSAGE));
           }
 
           if (oauthContext.getDancerState() == HAS_TOKEN) {
@@ -273,7 +274,7 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
       try {
         oauthContext = resolveContext(oauthContextSupplier);
         if (oauthContext == null) {
-          return exceptionally(new IllegalStateException(ERROR_GETTING_TOKEN_MESSAGE));
+          return exceptionallyCompleted(new IllegalStateException(ERROR_GETTING_TOKEN_MESSAGE));
         }
         if (oauthContext.getDancerState() == HAS_TOKEN) {
           if (accessToken.equals(oauthContext.getAccessToken())) {
@@ -295,12 +296,6 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
 
     // In any other case, a refresh is being done elsewhere, so we poll for it
     return pollForRefreshComplete(oauthContextSupplier, oauthContext);
-  }
-
-  private <T> CompletableFuture<T> exceptionally(Throwable t) {
-    CompletableFuture<T> cf = new CompletableFuture<>();
-    cf.completeExceptionally(t);
-    return cf;
   }
 
   private ResourceOwnerOAuthContext resolveContext(Supplier<ResourceOwnerOAuthContext> oauthContextSupplier) {

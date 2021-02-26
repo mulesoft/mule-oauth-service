@@ -9,6 +9,7 @@ package org.mule.service.oauth.internal;
 import static java.lang.Math.max;
 import static java.lang.Math.round;
 import static java.lang.Thread.sleep;
+import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.Assert.assertThat;
@@ -22,6 +23,7 @@ import static org.mule.runtime.oauth.api.state.DancerState.HAS_TOKEN;
 import static org.mule.service.oauth.internal.AbstractOAuthDancer.MAX_ATTEMPTS_PROPERTY;
 import static org.mule.service.oauth.internal.AbstractOAuthDancer.RETRY_INTERVAL_PROPERTY;
 
+import io.qameta.allure.Issue;
 import org.junit.Rule;
 import org.mule.runtime.oauth.api.builder.OAuthClientCredentialsDancerBuilder;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
@@ -36,7 +38,6 @@ import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -52,6 +53,7 @@ public class DefaultClientCredentialsTokenTestCase extends AbstractOAuthTestCase
   public SystemProperty retryInterval = new SystemProperty(RETRY_INTERVAL_PROPERTY, "1");
 
   @Test
+  @Issue("MULE-19239")
   public void cloudhubIssue() throws Exception {
     final Map<String, Object> tokensStore = mock(Map.class);
     final int iterations = 500;
@@ -79,7 +81,7 @@ public class DefaultClientCredentialsTokenTestCase extends AbstractOAuthTestCase
 
     List<Throwable> exceptions = Collections.synchronizedList(new LinkedList<>());
     CountDownLatch latch = new CountDownLatch(iterations);
-    ExecutorService executorService = Executors.newFixedThreadPool(10);
+    ExecutorService executorService = newFixedThreadPool(10);
     try {
       for (int i = 0; i < iterations; i++) {
         executorService.submit(() -> {
