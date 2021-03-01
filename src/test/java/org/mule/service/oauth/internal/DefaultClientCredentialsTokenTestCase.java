@@ -10,8 +10,9 @@ import static java.lang.Math.max;
 import static java.lang.Math.round;
 import static java.lang.Thread.sleep;
 import static java.util.concurrent.Executors.newFixedThreadPool;
-import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
@@ -24,6 +25,7 @@ import static org.mule.service.oauth.internal.AbstractOAuthDancer.MAX_ATTEMPTS_P
 import static org.mule.service.oauth.internal.AbstractOAuthDancer.RETRY_INTERVAL_PROPERTY;
 
 import io.qameta.allure.Issue;
+import org.junit.Before;
 import org.junit.Rule;
 import org.mule.runtime.oauth.api.builder.OAuthClientCredentialsDancerBuilder;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
@@ -45,6 +47,8 @@ import org.junit.Test;
 import org.mockito.stubbing.Answer;
 
 public class DefaultClientCredentialsTokenTestCase extends AbstractOAuthTestCase {
+
+  private static final int TEST_TIMEOUT_SECS = 120;
 
   @Rule
   public SystemProperty maxAttempts = new SystemProperty(MAX_ATTEMPTS_PROPERTY, "50");
@@ -95,11 +99,16 @@ public class DefaultClientCredentialsTokenTestCase extends AbstractOAuthTestCase
         });
       }
 
-      latch.await(1, MINUTES);
+      latch.await(TEST_TIMEOUT_SECS, SECONDS);
       assertThat(exceptions, hasSize(0));
       verify(tokenRefreshRequester, times(iterations)).apply(any());
     } finally {
       executorService.shutdownNow();
     }
+  }
+
+  @Override
+  public int getTestTimeoutSecs() {
+    return TEST_TIMEOUT_SECS;
   }
 }
