@@ -21,6 +21,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mule.runtime.oauth.api.state.DancerState.HAS_TOKEN;
+import static org.mule.service.oauth.internal.AbstractOAuthDancer.CHECK_OSV2_RACE_CONDITION;
 import static org.mule.service.oauth.internal.AbstractOAuthDancer.MAX_ATTEMPTS_PROPERTY;
 import static org.mule.service.oauth.internal.AbstractOAuthDancer.RETRY_INTERVAL_PROPERTY;
 
@@ -55,6 +56,9 @@ public class DefaultClientCredentialsTokenTestCase extends AbstractOAuthTestCase
 
   @Rule
   public SystemProperty retryInterval = new SystemProperty(RETRY_INTERVAL_PROPERTY, "1");
+
+  @Rule
+  public SystemProperty checkRaceCondition = new SystemProperty(CHECK_OSV2_RACE_CONDITION, "true");
 
   @Test
   @Issue("MULE-19239")

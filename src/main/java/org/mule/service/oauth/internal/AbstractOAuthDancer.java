@@ -6,6 +6,7 @@
  */
 package org.mule.service.oauth.internal;
 
+import static java.lang.Boolean.getBoolean;
 import static java.lang.Integer.getInteger;
 import static java.lang.Long.getLong;
 import static java.lang.String.format;
@@ -100,11 +101,13 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   private static final Logger LOGGER = getLogger(AbstractOAuthDancer.class);
 
   public static final int TOKEN_REQUEST_TIMEOUT_MILLIS = 60000;
+  public static final String CHECK_OSV2_RACE_CONDITION = SYSTEM_PROPERTY_PREFIX + "oauth.check-osv2-raceCondition";
   public static final String MAX_ATTEMPTS_PROPERTY = SYSTEM_PROPERTY_PREFIX + "oauth.get-context.max.attempts";
   public static final String RETRY_INTERVAL_PROPERTY = SYSTEM_PROPERTY_PREFIX + "oauth.get-context.retry.interval";
 
-  private final int MAX_ATTEMPTS = getInteger(MAX_ATTEMPTS_PROPERTY, 5);
-  private final long RETRY_INTERVAL = getLong(RETRY_INTERVAL_PROPERTY, 100l);
+  private final int maxAttempts = getInteger(MAX_ATTEMPTS_PROPERTY, 5);
+  private final long retryInterval = getLong(RETRY_INTERVAL_PROPERTY, 100l);
+  private final boolean checkOsv2RaceCondition;
 
   public static final String ERROR_GETTING_TOKEN_MESSAGE = "OAuthContext not available";
 
@@ -132,7 +135,8 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   private Scheduler pollScheduler;
 
   /**
-   * @deprecated since 4.2.2 - 4.3.0. Use {@link #AbstractOAuthDancer(String, String, String, String, Charset, String, ClientCredentialsLocation, String, String, String, Map, Function, SchedulerService, LockFactory, Map, HttpClient, MuleExpressionLanguage, List)}
+   * @deprecated since 4.2.2 - 4.3.0. Use
+   *             {@link #AbstractOAuthDancer(String, String, String, String, Charset, String, ClientCredentialsLocation, String, String, String, Map, Function, SchedulerService, LockFactory, Map, HttpClient, MuleExpressionLanguage, List)}
    */
   @Deprecated
   protected AbstractOAuthDancer(String name, String clientId, String clientSecret, String tokenUrl, Charset encoding,
@@ -180,6 +184,18 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     } else {
       this.listeners = new CopyOnWriteArrayList<>();
     }
+
+    if (getBoolean(CHECK_OSV2_RACE_CONDITION)) {
+      // MULE-19239
+      LOGGER.warn("*******************************************************************");
+      LOGGER.warn("About to workaround a race condition related to a distributed lock.");
+      LOGGER.warn("Be aware that this could cause unexpected behaviour");
+      LOGGER.warn("*******************************************************************");
+      this.checkOsv2RaceCondition = true;
+    } else {
+      this.checkOsv2RaceCondition = false;
+    }
+
   }
 
   @Override
@@ -299,16 +315,24 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   }
 
   private ResourceOwnerOAuthContext resolveContext(Supplier<ResourceOwnerOAuthContext> oauthContextSupplier) {
-    for (int i = 0; i < MAX_ATTEMPTS; i++) {
+    int retries = checkOsv2RaceCondition ? maxAttempts : 1;
+
+    for (int i = 0; i < retries; i++) {
       ResourceOwnerOAuthContext oauthContext = oauthContextSupplier.get();
       if (oauthContext != null) {
         return oauthContext;
       }
-      LOGGER.error("OAuthContext was null! retrying {}/{}...", i + 1, MAX_ATTEMPTS);
-      try {
-        MILLISECONDS.sleep(RETRY_INTERVAL);
-      } catch (InterruptedException e) {
-        return null;
+      if (i < retries - 1) {
+        // TODO change log level
+        LOGGER.error("OAuthContext was null! retrying {}/{}...", i + 1, maxAttempts);
+        try {
+          MILLISECONDS.sleep(retryInterval);
+        } catch (InterruptedException e) {
+          return null;
+        }
+      } else {
+        // TODO change log level
+        LOGGER.error("OAuthContext remains null after {} attempts", i + 1);
       }
     }
     return null;
