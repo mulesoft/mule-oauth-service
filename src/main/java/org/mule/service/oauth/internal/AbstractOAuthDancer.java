@@ -103,8 +103,8 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   public static final String MAX_ATTEMPTS_PROPERTY = SYSTEM_PROPERTY_PREFIX + "oauth.get-context.max.attempts";
   public static final String RETRY_INTERVAL_PROPERTY = SYSTEM_PROPERTY_PREFIX + "oauth.get-context.retry.interval";
 
-  private static final int MAX_ATTEMPTS = getInteger(MAX_ATTEMPTS_PROPERTY, 5);
-  private static final long RETRY_INTERVAL = getLong(RETRY_INTERVAL_PROPERTY, 100l);
+  private final int MAX_ATTEMPTS = getInteger(MAX_ATTEMPTS_PROPERTY, 5);
+  private final long RETRY_INTERVAL = getLong(RETRY_INTERVAL_PROPERTY, 100l);
 
   public static final String ERROR_GETTING_TOKEN_MESSAGE = "OAuthContext not available";
 
