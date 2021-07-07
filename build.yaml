@@ -1,4 +1,5 @@
 upstreamProjects:
-  Mule-runtime/mule/mule-4.x
+  Mule-runtime/mule/master
+  Mule-runtime/mule-oauth-client/master
 mavenSettingsXmlId: mule-runtime-maven-settings-MuleSettings
 projectType: runtime
