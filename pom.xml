@@ -18,7 +18,7 @@
         <caffeineVersion>2.8.0</caffeineVersion>
 
         <formatterConfigPath>formatter.xml</formatterConfigPath>
-        <muleOAuthClientVersion>1.0.0-SNAPSHOT</muleOAuthClientVersion>
+        <muleOAuthClientVersion>1.1.0-SNAPSHOT</muleOAuthClientVersion>
     </properties>
 
     <scm>
