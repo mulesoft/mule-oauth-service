@@ -217,12 +217,22 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
     return null;
   }
 
+  private ResourceOwnerOAuthContext getOauthContext(Supplier<ResourceOwnerOAuthContext> oauthContextSupplier) {
+    ResourceOwnerOAuthContext oauthContext = oauthContextSupplier.get();
+    if (oauthContext != null) {
+      return oauthContext;
+    }
+
+    throw new MuleRuntimeException(createStaticMessage("The retrieved OAuth context has a null value. Check the LockFactory used for the tokens store"),
+                                   new NullPointerException("OAuth context is null"));
+  }
+
   /**
    * Method for refreshing tokens in a thread-safe manner across nodes of a cluster.
    */
   protected <T> CompletableFuture<T> doRefreshToken(Supplier<ResourceOwnerOAuthContext> oauthContextSupplier,
                                                     Function<ResourceOwnerOAuthContext, CompletableFuture<T>> tokenRefreshRequester) {
-    ResourceOwnerOAuthContext oauthContext = oauthContextSupplier.get();
+    ResourceOwnerOAuthContext oauthContext = getOauthContext(oauthContextSupplier);
 
     final Lock lock = oauthContext.getRefreshOAuthContextLock(name, getLockProvider());
 
@@ -517,6 +527,12 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
         tokensStore.put(transformedResourceOwnerId, resourceOwnerOAuthContext);
       } else {
         resourceOwnerOAuthContext = tokensStore.get(transformedResourceOwnerId);
+
+        if (resourceOwnerOAuthContext == null) {
+          // This would never happen if the lock factory were well implemented.
+          throw new MuleRuntimeException(createStaticMessage("The retrieved OAuth context has a null value. Check the LockFactory used for the tokens store"),
+                                         new NullPointerException("OAuth context is null"));
+        }
       }
     } finally {
       lock.unlock();
