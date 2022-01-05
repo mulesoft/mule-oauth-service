@@ -489,11 +489,24 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
         getContextForResourceOwner(resourceOwner).getRefreshOAuthContextLock(name, getLockProvider());
     refreshUserOAuthContextLock.lock();
     try {
-      tokensStore.remove(resourceOwnerIdTransformer.apply(resourceOwner));
-      onEachListener(OAuthStateListener::onTokenInvalidated);
+      ResourceOwnerOAuthContext resourceOwnerOAuthContext =
+          tokensStore.remove(resourceOwnerIdTransformer.apply(resourceOwner));
+      onEachListener(getListenersToNotifyInvalidation(resourceOwnerOAuthContext), OAuthStateListener::onTokenInvalidated);
     } finally {
       refreshUserOAuthContextLock.unlock();
     }
+  }
+
+  /**
+   * Retrieves all the listeners that should be notified of a token invalidation event. Depending on the implementation these
+   * listeners could be the ones registered associated to the given resource owner in an explicit way and the ones that were
+   * registered in a general way (without indicating the resource owner).
+   *
+   * @param resourceOwnerOAuthContext context
+   * @return the listeners to be notified of the token invalidation event.
+   */
+  protected List<? extends OAuthStateListener> getListenersToNotifyInvalidation(ResourceOwnerOAuthContext resourceOwnerOAuthContext) {
+    return listeners;
   }
 
   /**
@@ -572,6 +585,10 @@ public abstract class AbstractOAuthDancer implements Startable, Stoppable {
   }
 
   protected void onEachListener(Consumer<OAuthStateListener> action) {
+    onEachListener(listeners, action);
+  }
+
+  protected void onEachListener(List<? extends OAuthStateListener> listeners, Consumer<OAuthStateListener> action) {
     listeners.forEach(listener -> {
       try {
         action.accept(listener);

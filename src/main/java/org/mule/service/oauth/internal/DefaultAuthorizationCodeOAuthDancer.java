@@ -77,6 +77,7 @@ import org.mule.runtime.oauth.api.builder.ClientCredentialsLocation;
 import org.mule.runtime.oauth.api.exception.RequestAuthenticationException;
 import org.mule.runtime.oauth.api.exception.TokenNotFoundException;
 import org.mule.runtime.oauth.api.exception.TokenUrlResponseException;
+import org.mule.runtime.oauth.api.listener.OAuthStateListener;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
 import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContextWithRefreshState;
 import org.mule.service.oauth.internal.authorizationcode.AuthorizationRequestUrlBuilder;
@@ -92,6 +93,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -127,6 +130,7 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
 
   private RequestHandlerManager redirectUrlHandlerManager;
   private RequestHandlerManager localAuthorizationUrlHandlerManager;
+  Map<String, CopyOnWriteArrayList<OAuthStateListener>> resourceOwnerListeners = new ConcurrentHashMap<>();
 
   public DefaultAuthorizationCodeOAuthDancer(Optional<HttpServer> httpServer, String name, String clientId, String clientSecret,
                                              String tokenUrl, String scopes, ClientCredentialsLocation clientCredentialsLocation,
@@ -182,6 +186,21 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
   @Override
   public void removeListener(AuthorizationCodeListener listener) {
     doRemoveListener(listener);
+  }
+
+  @Override
+  public void addListener(String resourceOwnerId, AuthorizationCodeListener listener) {
+    CopyOnWriteArrayList<OAuthStateListener> listeners =
+        resourceOwnerListeners.computeIfAbsent(resourceOwnerId, k -> new CopyOnWriteArrayList<>());
+    listeners.add(listener);
+  }
+
+  @Override
+  public void removeListener(String resourceOwnerId, AuthorizationCodeListener listener) {
+    List<OAuthStateListener> listeners = resourceOwnerListeners.get(resourceOwnerId);
+    if (listeners != null) {
+      listeners.remove(listener);
+    }
   }
 
   private static RequestHandlerManager addRequestHandler(HttpServer server, Method method, String path,
@@ -320,7 +339,8 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
                 updateResourceOwnerState(resourceOwnerOAuthContext, stateDecoder.decodeOriginalState(), tokenResponse);
                 updateResourceOwnerOAuthContext(resourceOwnerOAuthContext);
 
-                forEachListener(l -> l.onAuthorizationCompleted(resourceOwnerOAuthContext));
+                updateResourceOwnerListener(resourceOwnerOAuthContext,
+                                            l -> l.onAuthorizationCompleted(resourceOwnerOAuthContext));
                 afterDanceCallback.accept(beforeCallbackContext, resourceOwnerOAuthContext);
 
                 sendResponse(stateDecoder, responseCallback, OK, "Successfully retrieved access token",
@@ -556,7 +576,8 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
             }
             updateResourceOwnerState(resourceOwnerOAuthContext, null, tokenResponse);
             updateOAuthContextAfterTokenResponse(resourceOwnerOAuthContext);
-            forEachListener(l -> l.onTokenRefreshed(resourceOwnerOAuthContext));
+            updateResourceOwnerListener(resourceOwnerOAuthContext,
+                                        l -> l.onTokenRefreshed(resourceOwnerOAuthContext));
           });
         })
         .exceptionally(tokenUrlExceptionHandler(resourceOwnerOAuthContext));
@@ -592,7 +613,32 @@ public class DefaultAuthorizationCodeOAuthDancer extends AbstractOAuthDancer imp
     }
   }
 
-  private void forEachListener(Consumer<AuthorizationCodeListener> action) {
+  private void updateResourceOwnerListener(ResourceOwnerOAuthContext resourceOwnerOAuthContext,
+                                           Consumer<AuthorizationCodeListener> action) {
+    if (resourceOwnerListeners.containsKey(resourceOwnerOAuthContext.getResourceOwnerId())) {
+      onEachListener(resourceOwnerListeners.get(resourceOwnerOAuthContext.getResourceOwnerId()),
+                     l -> action.accept((AuthorizationCodeListener) l));
+    }
+
     onEachListener(l -> action.accept((AuthorizationCodeListener) l));
+  }
+
+  /**
+   * Retrieves all the listeners that should be notified of a token invalidation event, i.e. the ones registered associated to the
+   * given resource owner in an explicit way and the ones that were registered in a general way (without indicating the resource
+   * owner) in order not to break backward compatibility.
+   *
+   * @param resourceOwnerOAuthContext context
+   * @return the listeners to be notified of the token invalidation event.
+   */
+  @Override
+  protected List<? extends OAuthStateListener> getListenersToNotifyInvalidation(ResourceOwnerOAuthContext resourceOwnerOAuthContext) {
+    List<OAuthStateListener> tmp = new CopyOnWriteArrayList<>(super.getListenersToNotifyInvalidation(resourceOwnerOAuthContext));
+
+    if (resourceOwnerOAuthContext != null && resourceOwnerListeners.containsKey(resourceOwnerOAuthContext.getResourceOwnerId())) {
+      tmp.addAll(resourceOwnerListeners.get(resourceOwnerOAuthContext.getResourceOwnerId()));
+    }
+
+    return tmp;
   }
 }
