@@ -15,7 +15,7 @@
     <version>2.3.0-SNAPSHOT</version>
 
     <properties>
-        <javaModuleName>org.mule.runtime.oauth.service</javaModuleName>
+        <javaModuleName>org.mule.service.oauth</javaModuleName>
         <caffeineVersion>2.8.0</caffeineVersion>
 
         <formatterConfigPath>formatter.xml</formatterConfigPath>
