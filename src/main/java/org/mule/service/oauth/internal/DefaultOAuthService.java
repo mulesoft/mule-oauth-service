@@ -6,17 +6,17 @@
  */
 package org.mule.service.oauth.internal;
 
+import org.mule.oauth.client.api.builder.OAuthAuthorizationCodeDancerBuilder;
+import org.mule.oauth.client.api.builder.OAuthClientCredentialsDancerBuilder;
+import org.mule.oauth.client.api.http.HttpClientFactory;
+import org.mule.oauth.client.api.state.ResourceOwnerOAuthContext;
+import org.mule.oauth.client.internal.builder.DefaultOAuthAuthorizationCodeDancerBuilder;
+import org.mule.oauth.client.internal.builder.DefaultOAuthClientCredentialsDancerBuilder;
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.lock.LockFactory;
 import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.runtime.http.api.HttpService;
 import org.mule.runtime.oauth.api.OAuthService;
-import org.mule.runtime.oauth.api.builder.OAuthAuthorizationCodeDancerBuilder;
-import org.mule.runtime.oauth.api.builder.OAuthClientCredentialsDancerBuilder;
-import org.mule.runtime.oauth.api.http.HttpClientFactory;
-import org.mule.runtime.oauth.api.state.ResourceOwnerOAuthContext;
-import org.mule.runtime.oauth.internal.builder.DefaultOAuthAuthorizationCodeDancerBuilder;
-import org.mule.runtime.oauth.internal.builder.DefaultOAuthClientCredentialsDancerBuilder;
 
 import java.util.Map;
 
