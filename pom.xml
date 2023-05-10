@@ -46,6 +46,12 @@
                 <artifactId>mule-oauth-client</artifactId>
                 <version>${muleOAuthClientVersion}</version>
             </dependency>
+            <dependency>
+                <groupId>org.mule.commons</groupId>
+                <artifactId>mule-oauth-client-api</artifactId>
+                <version>${muleOAuthClientVersion}</version>
+                <scope>provided</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 

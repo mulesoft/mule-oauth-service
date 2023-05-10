@@ -6,17 +6,15 @@
  */
 package org.mule.service.oauth.internal;
 
-import org.mule.oauth.client.api.builder.OAuthAuthorizationCodeDancerBuilder;
-import org.mule.oauth.client.api.builder.OAuthClientCredentialsDancerBuilder;
 import org.mule.oauth.client.api.http.HttpClientFactory;
 import org.mule.oauth.client.api.state.ResourceOwnerOAuthContext;
-import org.mule.oauth.client.internal.builder.DefaultOAuthAuthorizationCodeDancerBuilder;
-import org.mule.oauth.client.internal.builder.DefaultOAuthClientCredentialsDancerBuilder;
 import org.mule.runtime.api.el.MuleExpressionLanguage;
 import org.mule.runtime.api.lock.LockFactory;
 import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.runtime.http.api.HttpService;
 import org.mule.runtime.oauth.api.OAuthService;
+import org.mule.service.oauth.internal.builder.Compatibility1xOAuthAuthorizationCodeDancerBuilder;
+import org.mule.service.oauth.internal.builder.Compatibility1xOAuthClientCredentialsDancerBuilder;
 
 import java.util.Map;
 
@@ -38,20 +36,20 @@ public class DefaultOAuthService implements OAuthService {
   }
 
   @Override
-  public <T> OAuthClientCredentialsDancerBuilder clientCredentialsGrantTypeDancerBuilder(LockFactory lockProvider,
-                                                                                         Map<String, T> tokensStore,
-                                                                                         MuleExpressionLanguage expressionEvaluator) {
-    return new DefaultOAuthClientCredentialsDancerBuilder(schedulerService, lockProvider,
-                                                          (Map<String, ResourceOwnerOAuthContext>) tokensStore,
-                                                          httpClientFactory, expressionEvaluator);
+  public <T> org.mule.runtime.oauth.api.builder.OAuthClientCredentialsDancerBuilder clientCredentialsGrantTypeDancerBuilder(LockFactory lockProvider,
+                                                                                                                            Map<String, T> tokensStore,
+                                                                                                                            MuleExpressionLanguage expressionEvaluator) {
+    return new Compatibility1xOAuthClientCredentialsDancerBuilder(schedulerService, lockProvider,
+                                                                  (Map<String, ResourceOwnerOAuthContext>) tokensStore,
+                                                                  httpClientFactory, expressionEvaluator);
   }
 
   @Override
-  public <T> OAuthAuthorizationCodeDancerBuilder authorizationCodeGrantTypeDancerBuilder(LockFactory lockProvider,
-                                                                                         Map<String, T> tokensStore,
-                                                                                         MuleExpressionLanguage expressionEvaluator) {
-    return new DefaultOAuthAuthorizationCodeDancerBuilder(schedulerService, lockProvider,
-                                                          (Map<String, ResourceOwnerOAuthContext>) tokensStore,
-                                                          httpService, httpClientFactory, expressionEvaluator);
+  public <T> org.mule.runtime.oauth.api.builder.OAuthAuthorizationCodeDancerBuilder authorizationCodeGrantTypeDancerBuilder(LockFactory lockProvider,
+                                                                                                                            Map<String, T> tokensStore,
+                                                                                                                            MuleExpressionLanguage expressionEvaluator) {
+    return new Compatibility1xOAuthAuthorizationCodeDancerBuilder(schedulerService, lockProvider,
+                                                                  (Map<String, ResourceOwnerOAuthContext>) tokensStore,
+                                                                  httpService, httpClientFactory, expressionEvaluator);
   }
 }
