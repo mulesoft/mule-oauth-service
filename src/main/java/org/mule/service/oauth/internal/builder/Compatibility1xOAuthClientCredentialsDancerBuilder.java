@@ -145,6 +145,11 @@ public class Compatibility1xOAuthClientCredentialsDancerBuilder extends DefaultO
   }
 
   @Override
+  public OAuthClientCredentialsDancerBuilder addListener(org.mule.runtime.oauth.api.listener.ClientCredentialsListener listener) {
+    return (OAuthClientCredentialsDancerBuilder) super.addListener(listener);
+  }
+
+  @Override
   @Deprecated
   public OAuthClientCredentialsDancerBuilder encodeClientCredentialsInBody(boolean encodeClientCredentialsInBody) {
     return (OAuthClientCredentialsDancerBuilder) super.encodeClientCredentialsInBody(encodeClientCredentialsInBody);

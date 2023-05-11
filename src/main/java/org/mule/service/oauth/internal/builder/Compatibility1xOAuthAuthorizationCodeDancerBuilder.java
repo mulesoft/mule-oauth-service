@@ -221,6 +221,11 @@ public class Compatibility1xOAuthAuthorizationCodeDancerBuilder extends DefaultO
   }
 
   @Override
+  public OAuthAuthorizationCodeDancerBuilder addListener(org.mule.runtime.oauth.api.listener.AuthorizationCodeListener listener) {
+    return (OAuthAuthorizationCodeDancerBuilder) super.addListener(listener);
+  }
+
+  @Override
   public OAuthAuthorizationCodeDancerBuilder addAdditionalRefreshTokenRequestParameters(MultiMap<String, String> additionalParameters) {
     return (OAuthAuthorizationCodeDancerBuilder) super.addAdditionalRefreshTokenRequestParameters(additionalParameters);
   }
