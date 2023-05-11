@@ -42,6 +42,7 @@ public final class Compatibility1xAuthorizationCodeOAuthDancer implements Author
     this.delegate = delegate;
   }
 
+  @Override
   public void initialise() throws InitialisationException {
     initialiseIfNeeded(delegate);
   }
@@ -56,6 +57,7 @@ public final class Compatibility1xAuthorizationCodeOAuthDancer implements Author
     stopIfNeeded(delegate);
   }
 
+  @Override
   public void dispose() {
     disposeIfNeeded(delegate, LOGGER);
   }
