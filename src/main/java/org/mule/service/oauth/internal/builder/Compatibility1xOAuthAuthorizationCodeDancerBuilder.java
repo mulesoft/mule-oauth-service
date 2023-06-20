@@ -240,4 +240,13 @@ public class Compatibility1xOAuthAuthorizationCodeDancerBuilder extends DefaultO
     return (OAuthAuthorizationCodeDancerBuilder) super.includeRedirectUriInRefreshTokenRequest(includeRedirectUriInRefreshTokenRequest);
   }
 
+  @Override
+  public OAuthAuthorizationCodeDancerBuilder customBodyParameters(Map<String, String> customBodyParameters) {
+    return (OAuthAuthorizationCodeDancerBuilder) super.customBodyParameters(customBodyParameters);
+  }
+
+  @Override
+  public OAuthAuthorizationCodeDancerBuilder customBodyParameters(Supplier<Map<String, String>> customBodyParameters) {
+    return (OAuthAuthorizationCodeDancerBuilder) super.customBodyParameters(customBodyParameters);
+  }
 }

@@ -140,6 +140,11 @@ public class Compatibility1xOAuthClientCredentialsDancerBuilder extends DefaultO
   }
 
   @Override
+  public OAuthClientCredentialsDancerBuilder customBodyParameters(Map<String, String> customBodyParameters) {
+    return (OAuthClientCredentialsDancerBuilder) super.customBodyParameters(customBodyParameters);
+  }
+
+  @Override
   public OAuthClientCredentialsDancerBuilder addListener(ClientCredentialsListener listener) {
     return (OAuthClientCredentialsDancerBuilder) super.addListener(listener);
   }
