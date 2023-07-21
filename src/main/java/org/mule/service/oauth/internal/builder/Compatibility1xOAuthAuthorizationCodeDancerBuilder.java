@@ -149,6 +149,7 @@ public class Compatibility1xOAuthAuthorizationCodeDancerBuilder extends DefaultO
     return (OAuthAuthorizationCodeDancerBuilder) super.localCallback(localCallbackUrl);
   }
 
+  @Override
   public OAuthAuthorizationCodeDancerBuilder localCallback(URL localCallbackUrl,
                                                            TlsContextFactory tlsContextFactory) {
     return (OAuthAuthorizationCodeDancerBuilder) super.localCallback(localCallbackUrl, tlsContextFactory);
