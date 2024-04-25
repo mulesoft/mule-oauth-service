@@ -18,7 +18,7 @@
         <javaModuleName>org.mule.service.oauth</javaModuleName>
 
         <caffeineVersion>2.8.0</caffeineVersion>
-        <muleOAuthClientVersion>2.1.3-SNAPSHOT</muleOAuthClientVersion>
+        <muleOAuthClientVersion>2.1.4-SNAPSHOT</muleOAuthClientVersion>
 
         <skipExportTests>false</skipExportTests>
         <formatterConfigPath>formatter.xml</formatterConfigPath>
