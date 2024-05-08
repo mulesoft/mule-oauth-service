@@ -58,6 +58,17 @@
         <dependency>
             <groupId>org.mule.commons</groupId>
             <artifactId>mule-oauth-client</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.mule.commons</groupId>
+                    <artifactId>mule-oauth-client-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.mule.commons</groupId>
+            <artifactId>mule-oauth-client-api</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.mule.runtime</groupId>
