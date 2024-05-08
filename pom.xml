@@ -18,7 +18,6 @@
         <javaModuleName>org.mule.service.oauth</javaModuleName>
 
         <caffeineVersion>2.8.0</caffeineVersion>
-        <muleOAuthClientVersion>2.2.0-SNAPSHOT</muleOAuthClientVersion>
 
         <skipExportTests>false</skipExportTests>
         <formatterConfigPath>formatter.xml</formatterConfigPath>
@@ -41,22 +40,6 @@
         </plugins>
     </build>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.mule.commons</groupId>
-                <artifactId>mule-oauth-client</artifactId>
-                <version>${muleOAuthClientVersion}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.mule.commons</groupId>
-                <artifactId>mule-oauth-client-api</artifactId>
-                <version>${muleOAuthClientVersion}</version>
-                <scope>provided</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-
     <dependencies>
         <dependency>
             <groupId>commons-codec</groupId>
@@ -75,6 +58,17 @@
         <dependency>
             <groupId>org.mule.commons</groupId>
             <artifactId>mule-oauth-client</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.mule.commons</groupId>
+                    <artifactId>mule-oauth-client-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.mule.commons</groupId>
+            <artifactId>mule-oauth-client-api</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.mule.runtime</groupId>
