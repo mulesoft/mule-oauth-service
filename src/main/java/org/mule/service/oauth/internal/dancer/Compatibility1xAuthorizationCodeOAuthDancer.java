@@ -111,4 +111,9 @@ public final class Compatibility1xAuthorizationCodeOAuthDancer implements Author
   public void removeListener(String resourceOwnerId, AuthorizationCodeListener listener) {
     delegate.removeListener(resourceOwnerId, listener);
   }
+
+  @Override
+  public boolean getInvalidateFromTokensStore(String resourceOwner) {
+    return delegate.getInvalidateFromTokensStore(resourceOwner);
+  }
 }
