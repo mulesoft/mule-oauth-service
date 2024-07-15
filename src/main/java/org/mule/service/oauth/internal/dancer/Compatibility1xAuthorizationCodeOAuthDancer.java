@@ -83,6 +83,11 @@ public final class Compatibility1xAuthorizationCodeOAuthDancer implements Author
   }
 
   @Override
+  public void invalidateContext(String resourceOwnerId, boolean forceInvalidateStatusRetrieval) {
+    delegate.invalidateContext(resourceOwnerId, forceInvalidateStatusRetrieval);
+  }
+
+  @Override
   public ResourceOwnerOAuthContext getContextForResourceOwner(String resourceOwnerId) {
     return delegate.getContextForResourceOwner(resourceOwnerId);
   }
