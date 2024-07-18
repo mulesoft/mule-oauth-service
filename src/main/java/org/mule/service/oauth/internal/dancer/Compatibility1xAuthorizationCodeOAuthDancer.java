@@ -83,6 +83,11 @@ public final class Compatibility1xAuthorizationCodeOAuthDancer implements Author
   }
 
   @Override
+  public void invalidateContext(String resourceOwnerId, boolean forceInvalidateStatusRetrieval) {
+    delegate.invalidateContext(resourceOwnerId, forceInvalidateStatusRetrieval);
+  }
+
+  @Override
   public ResourceOwnerOAuthContext getContextForResourceOwner(String resourceOwnerId) {
     return delegate.getContextForResourceOwner(resourceOwnerId);
   }
@@ -110,5 +115,10 @@ public final class Compatibility1xAuthorizationCodeOAuthDancer implements Author
   @Override
   public void removeListener(String resourceOwnerId, AuthorizationCodeListener listener) {
     delegate.removeListener(resourceOwnerId, listener);
+  }
+
+  @Override
+  public boolean getInvalidateFromTokensStore(String resourceOwner) {
+    return delegate.getInvalidateFromTokensStore(resourceOwner);
   }
 }
