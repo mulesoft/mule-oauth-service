@@ -28,4 +28,6 @@ module org.mule.test.service.oauth {
   requires org.mockito;
   requires junit;
   requires io.qameta.allure.commons;
+
+  exports org.mule.test.oauth.internal to junit;
 }
