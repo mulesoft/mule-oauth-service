@@ -5,6 +5,7 @@
         <groupId>org.mule.services</groupId>
         <artifactId>mule-core-services-parent</artifactId>
         <version>1.9.0-SNAPSHOT</version>
+        <relativePath/>
     </parent>
 
     <name>OAuth Service Implementation</name>
@@ -16,6 +17,8 @@
 
     <properties>
         <javaModuleName>org.mule.service.oauth</javaModuleName>
+
+        <oldMuleArtifactVersion>2.5.0</oldMuleArtifactVersion>
 
         <skipExportTests>false</skipExportTests>
         <formatterConfigPath>formatter.xml</formatterConfigPath>
