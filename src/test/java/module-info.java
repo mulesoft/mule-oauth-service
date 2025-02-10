@@ -4,7 +4,6 @@
  * license, a copy of which has been included with this distribution in the
  * LICENSE.txt file.
  */
-import org.mule.api.annotation.jpms.ServiceModule;
 
 /**
  * Provides OAuth authentication services.
@@ -12,7 +11,6 @@ import org.mule.api.annotation.jpms.ServiceModule;
  * @moduleGraph
  * @since 2.2
  */
-@ServiceModule
 module org.mule.test.service.oauth {
 
   requires org.mule.oauth.client.api;
@@ -20,6 +18,9 @@ module org.mule.test.service.oauth {
   requires org.mule.runtime.oauth.api;
   // lifecycle api
   requires org.mule.runtime.core;
+  requires org.mule.test.unit;
+  // To avoid duplicating the tests just for the coverage of the legacy dancers and builders
+  requires org.mule.test.oauth.client.impl;
 
   requires java.inject;
 

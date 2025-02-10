@@ -34,4 +34,7 @@ module org.mule.service.oauth {
       org.mule.test.service.oauth,
       com.mulesoft.test.mule.service.oauth.ee;
 
+  exports org.mule.service.oauth.internal.builder to
+      org.mule.test.service.oauth;
+
 }
