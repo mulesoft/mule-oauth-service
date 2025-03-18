@@ -22,8 +22,6 @@ module org.mule.test.service.oauth {
   // To avoid duplicating the tests just for the coverage of the legacy dancers and builders
   requires org.mule.test.oauth.client.impl;
 
-  requires java.inject;
-
   requires org.mule.service.oauth;
   requires org.hamcrest;
   requires org.mockito;
