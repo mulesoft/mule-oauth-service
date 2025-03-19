@@ -21,8 +21,6 @@ module org.mule.service.oauth {
   // lifecycle api
   requires org.mule.runtime.core;
 
-  requires java.inject;
-
   // Allow invocation and injection into providers by the Mule Runtime
   exports org.mule.service.oauth.provider to
       org.mule.runtime.service;
