@@ -13,7 +13,7 @@ import org.mule.runtime.http.api.HttpService;
 import org.mule.runtime.oauth.api.OAuthService;
 import org.mule.service.oauth.internal.DefaultOAuthService;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class OAuthServiceProvider implements ServiceProvider {
 
