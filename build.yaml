@@ -1,6 +1,6 @@
 upstreamProjects:
   Mule-runtime/mule/4.6.16-DRY-RUN,
-  Mule-runtime/mule-oauth-client/support/2.1.x
+  Mule-runtime/mule-oauth-client/2.1.16-DRY-RUN
 mavenSettingsXmlId: mule-runtime-maven-settings-MuleSettings
 projectType: runtime
 jdkTool: OPEN-JDK17
