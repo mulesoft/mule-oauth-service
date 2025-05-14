@@ -19,7 +19,6 @@
         <javaModuleName>org.mule.service.oauth</javaModuleName>
 
         <skipExportTests>false</skipExportTests>
-        <formatterConfigPath>formatter.xml</formatterConfigPath>
     </properties>
 
     <scm>
@@ -117,7 +116,6 @@
             <groupId>org.mule.commons</groupId>
             <artifactId>mule-oauth-client</artifactId>
             <type>test-jar</type>
-            <version>${muleOAuthClientVersion}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
