@@ -26,7 +26,7 @@ import java.util.function.Function;
 
 /**
  * Provides compatibility with version 1.x of the mule-oauth-client, which was a transitive api of the service api.
- * 
+ *
  * @since 2.3
  */
 public class Compatibility1xOAuthClientCredentialsDancerBuilder extends DefaultOAuthClientCredentialsDancerBuilder
