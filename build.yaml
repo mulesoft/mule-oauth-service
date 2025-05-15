@@ -1,5 +1,5 @@
 upstreamProjects:
-  Mule-runtime/mule/4.6.16,
+  Mule-runtime/mule/4.6.17,
   Mule-runtime/mule-oauth-client/2.1.16
 mavenSettingsXmlId: mule-runtime-maven-settings-MuleSettings
 projectType: runtime
