@@ -21,7 +21,7 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * Provides compatibility with version 1.x of the mule-oauth-client, which was a transitive api of the service api.
- * 
+ *
  * @since 2.3
  */
 public final class Compatibility1xClientCredentialsOAuthDancer implements ClientCredentialsOAuthDancer, Startable, Stoppable {
