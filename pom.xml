@@ -12,7 +12,7 @@
 
     <artifactId>mule-service-oauth</artifactId>
     <packaging>mule-service</packaging>
-    <version>2.3.18-SNAPSHOT</version>
+    <version>2.3.19-SNAPSHOT</version>
 
     <properties>
         <javaModuleName>org.mule.service.oauth</javaModuleName>
