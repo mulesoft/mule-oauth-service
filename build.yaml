@@ -1,6 +1,6 @@
 upstreamProjects:
   Mule-runtime/mule/master-TESTCYCLE-2020-DRY-RUN,
-  Mule-runtime/mule-oauth-client/master
+  Mule-runtime/mule-oauth-client/master-TESTCYCLE-2020-DRY-RUN
 mavenSettingsXmlId: mule-runtime-maven-settings-MuleSettings
 projectType: runtime
 mavenTool: "3.9.9"
